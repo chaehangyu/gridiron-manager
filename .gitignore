@@ -13,3 +13,4 @@ saves/
 .vscode/
 .idea/
 .DS_Store
+data/raw/
