@@ -91,9 +91,15 @@ def engine_depth(team: Team, players: dict[str, Player]) -> dict[str, list[str]]
         for slot in ordered_slots:
             ids = team.depth_chart.get(slot, [])
             if rank < len(ids):
+                pid = ids[rank]
+                if pid not in players:
+                    continue
+                # 풀백 자리에 선 TE는 엔진에서 RB가 아니라 TE로만 쓴다 (러닝 플레이 볼 캐리어 방지)
+                if slot == "FB" and players[pid].position not in (Position.FB, Position.RB):
+                    continue
                 eng = slot_maps[slot]
-                if ids[rank] not in depth[eng] and ids[rank] in players:
-                    depth[eng].append(ids[rank])
+                if pid not in depth[eng]:
+                    depth[eng].append(pid)
 
     roster = [p for p in players.values() if p.team == team.abbr and p.roster_status == RosterStatus.ACTIVE]
     for p in sorted(roster, key=position_rating, reverse=True):

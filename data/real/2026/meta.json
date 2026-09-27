@@ -1,0 +1,14 @@
+{
+  "season": 2026,
+  "roster_week": 1,
+  "depth_chart_snapshot": "2026-09-08",
+  "first_game_day": "2026-09-09",
+  "fetched_at": "2026-09-27T08:49:57+00:00",
+  "source": "nflverse via nflreadpy",
+  "counts": {
+    "players": 2934,
+    "depth_rows": 2167,
+    "games": 272,
+    "teams": 32
+  }
+}

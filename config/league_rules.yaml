@@ -28,4 +28,5 @@ game:
   # M2 실데이터 결과 모델로 바뀌면 다시 1.0에서 시작한다.
   sack_factor: 0.85
   completion_factor: 1.03
-  fg_accuracy_factor: 1.05
+  fg_accuracy_factor: 1.09
+  rush_yds_factor: 0.97
