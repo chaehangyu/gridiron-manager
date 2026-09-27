@@ -1,0 +1,18 @@
+# 포지션 평가(PR) 가중치 — PRD F2-3a. 합이 1이 아니어도 된다 (정규화해서 쓴다).
+# M3 능력치 파이프라인에서 실제 성적을 가장 잘 설명하도록 다시 적합한다.
+QB: {short_accuracy: 15, medium_accuracy: 15, deep_accuracy: 12, decision: 15, pocket_presence: 10, throw_power: 10, football_iq: 8, throw_on_run: 5, composure: 5, speed: 3, ball_security: 2}
+RB: {vision: 18, elusiveness: 15, break_tackle: 15, speed: 12, acceleration: 10, ball_security: 10, catching: 8, agility: 7, pass_block: 5}
+FB: {lead_block: 35, run_block: 20, strength: 15, break_tackle: 10, catching: 10, pass_block: 10}
+WR: {route_running: 22, catching: 20, speed: 15, release: 12, contested_catch: 10, acceleration: 8, agility: 8, elusiveness: 5}
+TE: {run_block: 18, catching: 15, route_running: 15, pass_block: 12, strength: 10, contested_catch: 8, speed: 8, break_tackle: 8, release: 6}
+OT: {pass_block: 38, run_block: 28, strength: 12, agility: 10, football_iq: 6, acceleration: 6}
+OG: {run_block: 35, pass_block: 30, strength: 18, agility: 7, football_iq: 5, acceleration: 5}
+C: {run_block: 30, pass_block: 30, football_iq: 15, strength: 15, agility: 10}
+EDGE: {finesse_rush: 22, power_rush: 20, acceleration: 12, block_shedding: 12, run_stop: 12, speed: 8, strength: 8, tackling: 6}
+DT: {block_shedding: 20, run_stop: 20, power_rush: 18, strength: 16, finesse_rush: 10, tackling: 8, acceleration: 8}
+LB: {tackling: 20, run_stop: 15, pursuit: 12, football_iq: 12, zone_coverage: 12, block_shedding: 8, speed: 8, man_coverage: 5, finesse_rush: 4, power_rush: 4}
+CB: {man_coverage: 25, zone_coverage: 20, speed: 18, press: 10, ball_skills: 10, agility: 7, acceleration: 5, tackling: 5}
+S: {zone_coverage: 22, speed: 14, tackling: 14, man_coverage: 12, football_iq: 12, ball_skills: 10, pursuit: 8, run_stop: 8}
+K: {kick_power: 50, kick_accuracy: 50}
+P: {punt_power: 50, punt_accuracy: 50}
+LS: {composure: 50, football_iq: 30, strength: 20}
