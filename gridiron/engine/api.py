@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 
 from ..domain.models import League, ScheduledGame
 from .adapter import build_team
+from .norms import compute_norms
 from .outcome.base import OutcomeModel
 from .skeleton.game import GameSim
 from .skeleton.settings import GameSettings
@@ -35,6 +36,7 @@ class GameOutcome:
     box: dict
     play_by_play: list[dict] = field(default_factory=list)
     scoring_summary: list[dict] = field(default_factory=list)
+    wp_series: list[tuple] = field(default_factory=list)
 
 
 def simulate(league: League, game: ScheduledGame, seed: int, *, outcome: OutcomeModel | None = None,
@@ -42,9 +44,13 @@ def simulate(league: League, game: ScheduledGame, seed: int, *, outcome: Outcome
     day = game.gameday or league.season_start()
     home = build_team(league, game.home, 0, day)
     away = build_team(league, game.away, 1, day)
+    if outcome is None:
+        from .outcome.data_model import DataOutcome
+        outcome = DataOutcome()
     sim = GameSim([home, away], settings=settings or GameSettings.from_config(), outcome=outcome, seed=seed,
                   do_play_by_play=play_by_play, playoffs=game.game_type != "REG", neutral_site=game.neutral_site,
-                  gid=game.game_id)
+                  gid=game.game_id, venue={"roof": game.roof, "surface": game.surface},
+                  norms=compute_norms(league))
     res = sim.run()
     teams = {t.abbr: _clean(t.stat) for t in res["team"]}
     players = {}
@@ -58,4 +64,4 @@ def simulate(league: League, game: ScheduledGame, seed: int, *, outcome: Outcome
     events = [e for e in res["playByPlay"] if e["type"] != "clock"] if play_by_play else []
     return GameOutcome(game=game, seed=seed, home_score=game.home_score, away_score=game.away_score,
                        overtimes=res["overtimes"], box={"teams": teams, "players": players, "plays": events},
-                       play_by_play=res["playByPlay"], scoring_summary=res["scoringSummary"])
+                       play_by_play=res["playByPlay"], scoring_summary=res["scoringSummary"], wp_series=sim.wp_series)

@@ -42,6 +42,7 @@ class TeamGameSim:
     stat: defaultdict = field(default_factory=new_stat)
     composite: dict[str, float] = field(default_factory=dict)
     pace: float = 1.0
+    front: str = "4-3"
 
     def __post_init__(self) -> None:
         self.stat["ptsQtrs"] = [0]

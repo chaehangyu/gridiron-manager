@@ -50,6 +50,12 @@ def _print_box(out, league: League) -> None:
         if best and best[1][1].get(key, 0):
             leaders.append(f"{label}: {league.players[best[0]].name} ({best[1][0]}) {best[1][1][key]}")
     print("주요 기록 — " + " · ".join(leaders))
+    if out.wp_series:
+        ends = {}
+        for q, clock, wp in out.wp_series:
+            ends[min(q, 5)] = wp
+        path = " → ".join(f"{'Q' + str(q) if q <= 4 else 'OT'} {wp * 100:.0f}%" for q, wp in sorted(ends.items()))
+        print(f"{home.nickname} 승률 추이 — {path}")
 
 
 def cmd_fetch(args) -> None:

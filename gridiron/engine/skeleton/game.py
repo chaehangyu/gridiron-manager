@@ -49,13 +49,17 @@ class GameSim:
     def __init__(self, teams: list[TeamGameSim], *, settings: GameSettings | None = None,
                  outcome: OutcomeModel | None = None, seed: int | None = None, do_play_by_play: bool = False,
                  playoffs: bool = False, neutral_site: bool = False, home_court_factor: float = 1.0,
-                 gid: str = "") -> None:
+                 gid: str = "", venue: dict | None = None, norms: dict | None = None) -> None:
         self.id = gid
         self.settings = settings or GameSettings()
         self.outcome: OutcomeModel = outcome or FbgmOutcome()
         self.rng = Rng(seed)
         self.playoffs = playoffs
         self.neutral_site = neutral_site
+        self.venue = venue or {}
+        self.norms = norms          # 포지션별 능력치 기준값 (DataOutcome 표준점수용)
+        self.call = None            # 결과 모델이 고른 이번 플레이의 콜 (DataOutcome)
+        self.wp_series: list[tuple[int, float, float]] = []  # (쿼터, 시계, 홈 승률)
         self.team = teams
         self.playByPlay = PlayByPlayLogger(do_play_by_play)
         self.playByPlay.game = self
@@ -238,6 +242,8 @@ class GameSim:
         if self.awaitingAfterTouchdown:
             if not self.settings.two_point_conversions:
                 return "extraPoint"
+            if hasattr(self.outcome, "two_point_decision"):
+                return "twoPointConversion" if self.outcome.two_point_decision(self) else "extraPoint"
             if pts_down == 2 and rng.random() < 0.7:
                 return "twoPointConversion"
             if quarter >= self.num_periods - 1:
@@ -290,7 +296,13 @@ class GameSim:
                 and pts_down < 3 and self.probMadeFieldGoal() >= 0.9):
             return "fieldGoal"
 
-        if self.down == 4 and not need_touchdown:
+        if self.down == 4 and not need_touchdown and hasattr(self.outcome, "fourth_down_decision"):
+            choice = self.outcome.fourth_down_decision(self)
+            if choice == "fieldGoal":
+                return "fieldGoal"
+            if choice == "punt" and not never_punt:
+                return "punt"
+        elif self.down == 4 and not need_touchdown:
             prob_fg = self.probMadeFieldGoal()
             if (prob_fg >= 0.5 and quarter == self.num_periods and self.clock <= 6
                     and ((0 <= pts_down <= 2) or (-8 <= pts_down <= -4))):
@@ -332,8 +344,12 @@ class GameSim:
             self.toGo = 100 - self.scrimmage
 
         self.currentPlay = Play(self)
+        extra = {}
+        if self.playByPlay.active and hasattr(self.outcome, "state_values"):
+            extra = self.outcome.state_values(self)  # 플레이 직전 기대득점·홈 승률 (PRD F5-5d)
         self.playByPlay.logClock(awaitingKickoff=self.awaitingKickoff, awaitingAfterTouchdown=self.awaitingAfterTouchdown,
-                                 clock=self.clock, down=self.down, scrimmage=self.scrimmage, t=self.o, toGo=self.toGo)
+                                 clock=self.clock, down=self.down, scrimmage=self.scrimmage, t=self.o, toGo=self.toGo,
+                                 playType=play_type, **extra)
 
         if self.o != self.currentDrive and self.down == 1 and play_type not in (
                 "kickoff", "onsideKick", "extraPoint", "twoPointConversion"):
@@ -414,6 +430,8 @@ class GameSim:
         self.updatePlayingTime(dt)
         if play_type != "kneel":
             self.injuries()
+        if self.playByPlay.active and hasattr(self.outcome, "win_probability"):
+            self.wp_series.append((len(self.team[0].stat["ptsQtrs"]), self.clock, self.outcome.win_probability(self)))
 
         if self.team[0].stat["pts"] != self.team[1].stat["pts"] and (
             (self.overtimeState is not None and self.overtimeType == "suddenDeath")
@@ -463,8 +481,10 @@ class GameSim:
         tc_d["tackling"] = composite_factor(self.playersOnField[d], FACTOR_OPTIONS["tackling"])
         tc_o["passBlocking"], tc_o["runBlocking"] = blocking_factors(self.playersOnField[o])
 
-    def updatePlayersOnField(self, play_type: str) -> None:
-        if play_type in ("starters", "startersFake"):
+    def updatePlayersOnField(self, play_type: str, formation: dict | None = None) -> None:
+        if formation is not None:
+            pass
+        elif play_type in ("starters", "startersFake"):
             formation = formations.NORMAL[0]
         elif play_type in ("run", "pass"):
             formation = self.rng.choice(formations.NORMAL)
@@ -572,8 +592,12 @@ class GameSim:
                         rng_lo += diff
                         rng_hi += diff
             returner = self.getTopPlayerOnField(self.d, "KR")
-            kick_to = rng.rand_int(rng_lo, rng_hi)
-            touchback = kick_to <= -10 or (kick_to < 0 and rng.random() < 0.8)
+            data_return = None
+            if hasattr(self.outcome, "kickoff") and not self.awaitingAfterSafety:
+                kick_to, touchback, data_return = self.outcome.kickoff(self, kicker, returner)
+            else:
+                kick_to = rng.rand_int(rng_lo, rng_hi)
+                touchback = kick_to <= -10 or (kick_to < 0 and rng.random() < 0.8)
             self.currentPlay.addEvent({"type": "k", "p": kicker, "kickTo": kick_to})
             self.playByPlay.logEvent({"type": "kickoff", "names": [kicker.name], "t": self.o, "touchback": touchback,
                                       "yds": kick_to})
@@ -581,7 +605,7 @@ class GameSim:
             if touchback:
                 self.currentPlay.addEvent({"type": "touchbackKick", "p": kicker})
             else:
-                raw = self.outcome.kickoff_return_yds(self, returner)
+                raw = data_return if data_return is not None else self.outcome.kickoff_return_yds(self, returner)
                 length = self.currentPlay.boundedYds(raw)
                 dt = abs(length) / 8
                 self.checkPenalties("kickoffReturn", ball_carrier=returner, play_yds=length)
@@ -746,10 +770,10 @@ class GameSim:
             p = self.pickPlayer(self.d, "passRushing" if self.rng.random() < 0.5 else "runStopping")
         self.currentPlay.addEvent({"type": "defSft", "p": p})
 
-    def doSack(self, qb: PlayerGameSim, pbw: dict) -> float:
+    def doSack(self, qb: PlayerGameSim, pbw: dict, yds: int | None = None) -> float:
         d = self.currentPlay.state["initial"].d
         p = self.pickPlayer(d, "passRushing", None, 5)
-        yds = self.currentPlay.boundedYds(self.rng.rand_int(-1, -12))
+        yds = self.currentPlay.boundedYds(self.rng.rand_int(-1, -12) if yds is None else min(0, yds))
         ol = None
         if p in (self.playersOnField[d].get("DL") or []) or p in (self.playersOnField[d].get("LB") or []):
             losers = [bp for bp, info in pbw.items() if not info["won"] and info["type"] == "OL"]
@@ -762,9 +786,14 @@ class GameSim:
                                   "t": self.currentPlay.state["initial"].o, "yds": yds})
         return float(self.rng.rand_int(3, 8))
 
+    def _call(self, kind: str) -> dict | None:
+        """결과 모델이 콜을 고르면 그 퍼스넬로 포메이션을 정한다."""
+        self.call = self.outcome.call_play(self, kind) if hasattr(self.outcome, "call_play") else None
+        return self.call.formation if self.call is not None else None
+
     def doPass(self) -> float:
         o = self.o
-        self.updatePlayersOnField("pass")
+        self.updatePlayersOnField("pass", self._call("pass"))
         if self.checkPenalties("beforeSnap"):
             return 0.0
         plan = self.outcome.pass_play(self)
@@ -776,7 +805,7 @@ class GameSim:
         if plan.qb_fumble:
             return dt + self.doFumble(qb, self.currentPlay.boundedYds(plan.qb_fumble_yds))
         if plan.sack:
-            return self.doSack(qb, plan.pbw)
+            return self.doSack(qb, plan.pbw, plan.extra.get("sack_yds"))
         if plan.scramble:
             return self.doRun(True)
 
@@ -823,7 +852,7 @@ class GameSim:
                 positions.append("QB")
             elif r < 0.57:
                 positions.append("WR")
-            self.updatePlayersOnField("run")
+            self.updatePlayersOnField("run", self._call("run"))
             if self.checkPenalties("beforeSnap"):
                 return 0.0
 

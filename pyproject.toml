@@ -14,7 +14,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-data = ["nflreadpy>=0.1.5", "polars>=1.0", "pandas>=2", "pyarrow>=15"]
+data = ["nflreadpy>=0.1.5", "polars>=1.0", "pandas>=2", "pyarrow>=15", "scikit-learn>=1.4"]
 dev = ["pytest>=8"]
 
 [project.scripts]

@@ -22,8 +22,10 @@ game:
   timeouts_overtime: 2
   scrimmage_touchback_kickoff: 35  # 2025년 킥오프 터치백 35야드
   two_point_conversions: true
-  home_advantage_pct: 1.0
+  home_advantage_pct: 1.0         # 임시 모델용. 실측 모델의 홈 이점은 config/engine.yaml home_advantage
+  pace: 1.05                      # 경기 흐름 속도 (시계가 흐를 때 플레이 사이 시간 ÷ pace)
   base_injury_rate: 0.0008
+  # 아래 계수는 임시 결과 모델(FbgmOutcome)에만 쓰인다. 실측 결과 모델(DataOutcome)은 config/engine.yaml을 쓴다.
   # 임시 결과 모델(FbgmOutcome) 보정. 샘플 리그 500경기 기준으로 PRD §8.4 범위에 맞췄다.
   # M2 실데이터 결과 모델로 바뀌면 다시 1.0에서 시작한다.
   sack_factor: 0.85

@@ -145,4 +145,4 @@ def build_team(league: League, abbr: str, team_num: int, on_day: date) -> TeamGa
     cache: dict[str, PlayerGameSim] = {p.id: to_game_player(p, POSITION_TO_ENGINE[p.position], on_day) for p in roster}
     depth_ids = engine_depth(team, {p.id: p for p in roster})
     depth = {pos: [cache[i] for i in ids if i in cache] for pos, ids in depth_ids.items()}
-    return TeamGameSim(id=team_num, abbr=abbr, players=list(cache.values()), depth=depth)
+    return TeamGameSim(id=team_num, abbr=abbr, players=list(cache.values()), depth=depth, front=team.front.value)

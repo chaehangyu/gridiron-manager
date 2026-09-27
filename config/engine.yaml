@@ -1,0 +1,43 @@
+# 실측 결과 모델(DataOutcome) 파라미터 — ENGINE_DESIGN §5, §9
+# 능력치 차이 Δ = 공격 유닛 − 수비 유닛 (포지션별 주전 평균·표준편차 기준 표준점수).
+# 계수는 "주전 표준편차 1만큼 차이"당 효과이며, M3에서 2025 재현 테스트로 적합한다 (초기값).
+beta:
+  pressure: 0.30        # 패스 러시 vs 패스 블록 → 압박 로짓
+  sack: 0.30            # 압박 시 QB 포켓 감각·회피 → 색 로짓 (음수 방향)
+  scramble: 0.35        # QB 기동력 → 스크램블 로짓
+  completion: 0.25      # QB 정확도 + 리시버 vs 커버리지 → 완성 로짓
+  interception: 0.25    # QB 판단력 vs 볼 스킬 → INT 로짓 (음수 방향)
+  air: 0.10             # 에어 야드 분위수
+  yac: 0.25             # 캐치 후 야드 분위수
+  run: 0.25             # 런 야드 분위수
+  scramble_yards: 0.20
+  kick: 0.12            # 킥 정확도 1점당 FG 로짓
+  returns: 0.15         # 리턴 야드 분위수
+home_advantage: 0.03     # 홈 공격 분위수·로짓 보정
+fumble_per_touch: 0.0065 # 터치당 펌블 (절반은 공격이 회복)
+# 의도한 깊이 → 실제 던진 깊이 기본 전환 (체크다운 포함). 여기에 커버리지·압박 비율(실측)을 곱한다.
+intent_to_depth:
+  screen: {screen: 1.0}
+  quick: {quick: 0.9, inter: 0.1}
+  inter: {quick: 0.25, inter: 0.65, deep: 0.10}
+  deep: {quick: 0.15, inter: 0.25, deep: 0.60}
+depth_ratio_power: 1.8   # 커버리지·압박 깊이 비율 지수 (tools/check_reproduction.py로 실측 E5에 맞춤)
+# 4th down·2점 판단 (nfl4th 방식). margin > 0이면 WP 최적보다 보수적.
+decisions:
+  fourth_down_go_margin: 0.02
+  fg_max_distance: 62            # 전·후반 막판(fieldGoalLate)은 별도 규칙
+  fg_long_margin: 0.012          # 50야드 이상 FG 선택에 주는 보수성 여유
+  two_point_margin: 0.0008        # 실제 감독은 승률 최적보다 2점 시도를 덜 한다
+  expected_kickoff_start: 30      # 상대 킥오프 후 평균 시작 위치 (자기 진영, 2025 규칙)
+# 평균 매치업 중심 보정: 평균적인 두 팀이 붙을 때 Δ 평균이 0이 되도록 뺀다.
+# (필드에는 주전이 백업보다 자주 서고, 타깃은 좋은 리시버에게 몰린다 — 실측 분포에 이미 들어 있는 선택 효과)
+# 측정: python tools/calibrate_centers.py 200 (샘플 리그). 실데이터 능력치(M3) 도입 후 다시 측정한다.
+center:
+  rush: 0.295
+  pass: 0.152
+  int: -0.299
+  yac: 0.322
+  pocket: -0.011
+  mobility: -0.030
+  run: 0.207
+  scramble: 0.062
