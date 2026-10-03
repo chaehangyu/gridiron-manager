@@ -90,15 +90,25 @@ def zone_of(yardline_100: float) -> str:
 class DataOutcome:
     name = "data"
 
-    def __init__(self) -> None:
+    def __init__(self, beta_scale: float | None = None, center: dict[str, float] | None = None) -> None:
+        """beta_scale·center는 보정 도구(재현 테스트·중심 측정)가 설정 파일 값을 바꿔 볼 때만 넘긴다."""
         p = _params()
-        self.beta = p["beta"]
+        scale = p.get("beta_scale", 1.0) if beta_scale is None else beta_scale
+        self.beta = {k: v * scale for k, v in p["beta"].items()}
         self.home_adv = p["home_advantage"]
         self.fumble_per_touch = p["fumble_per_touch"]
         self.intent = p["intent_to_depth"]
-        self.center = p.get("center", {})
+        self.center = dict(p.get("center", {})) if center is None else center
         self.depth_ratio_power = p.get("depth_ratio_power", 1.0)
         self._punt_row = None
+
+    @classmethod
+    def for_league(cls, league) -> "DataOutcome":
+        """리그 능력치 분포에 맞는 중심값을 쓴다: 실측 능력치 리그는 `center`, 가상 샘플 리그는 `center_sample`."""
+        p = _params()
+        if getattr(league, "source", "") == "sample" and "center_sample" in p:
+            return cls(center=dict(p["center_sample"]))
+        return cls()
 
     # ── 공통 ──────────────────────────────────────────────
     def _home(self, g: "GameSim") -> float:

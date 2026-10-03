@@ -1,6 +1,7 @@
 """`data/real/<season>/` CSV → League (실제 NFL 리그).
 
-능력치는 M3 파이프라인 전까지 `ratings.provisional`의 임시 값을 쓴다 (ratings_source="provisional").
+능력치: `ratings.csv`(M3 실측 파이프라인 결과)가 있으면 그것을 쓰고 `ratings_overrides.csv`(수동 보정)를 덮는다.
+없거나 목록에 없는 선수는 `ratings.provisional`의 임시 값을 쓴다 (ratings_source="provisional").
 """
 from __future__ import annotations
 
@@ -9,6 +10,7 @@ from datetime import date
 from pathlib import Path
 
 from ..config import DATA_DIR
+from ..domain.attributes import ATTR_KEYS, clamp
 from ..domain.depth import auto_depth_chart
 from ..domain.models import League, Player, RosterStatus, ScheduledGame, Team
 from ..domain.positions import Front, Position
@@ -28,6 +30,24 @@ def _date(v: str) -> date | None:
     return date.fromisoformat(v[:10]) if v else None
 
 
+def load_ratings(base: Path) -> dict[str, tuple[str, dict[str, float]]]:
+    """gsis_id → (basis, 능력치). 수동 보정 CSV(gsis_id, attribute, value)를 마지막에 덮는다."""
+    path = base / "ratings.csv"
+    if not path.exists():
+        return {}
+    out: dict[str, tuple[str, dict[str, float]]] = {}
+    with path.open(encoding="utf-8") as f:
+        for r in csv.DictReader(f):
+            out[r["gsis_id"]] = (r["basis"], {k: float(r[k]) for k in ATTR_KEYS})
+    ov = base / "ratings_overrides.csv"
+    if ov.exists():
+        with ov.open(encoding="utf-8") as f:
+            for r in csv.DictReader(f):
+                if r["gsis_id"] in out and r["attribute"] in ATTR_KEYS and r["value"]:
+                    out[r["gsis_id"]][1][r["attribute"]] = clamp(float(r["value"]))
+    return out
+
+
 def load_real_league(season: int = 2026, data_dir: Path | None = None) -> League:
     base = data_dir or DATA_DIR / "real" / str(season)
     if not (base / "players.csv").exists():
@@ -40,23 +60,29 @@ def load_real_league(season: int = 2026, data_dir: Path | None = None) -> League
                                     division=r["division"], color=r["color"], color2=r["color2"],
                                     front=Front(r["front"]))
 
+    measured = load_ratings(base)
     players: dict[str, Player] = {}
     with (base / "players.csv").open(encoding="utf-8") as f:
         for r in csv.DictReader(f):
             status = RosterStatus(r["roster_status"])
             pos = Position(r["position"])
             exp = _int(r["years_exp"]) or 0
-            q = provisional_quality(r["gsis_id"], _int(r["depth_rank"]), _int(r["draft_round"]), exp,
-                                    on_practice_squad=status == RosterStatus.PRACTICE_SQUAD,
-                                    free_agent=status == RosterStatus.FREE_AGENT)
             height, weight = _int(r["height_in"]), _int(r["weight_lb"])
+            if r["gsis_id"] in measured:
+                source, attributes = measured[r["gsis_id"]]
+                source = f"measured:{source}"
+            else:
+                q = provisional_quality(r["gsis_id"], _int(r["depth_rank"]), _int(r["draft_round"]), exp,
+                                        on_practice_squad=status == RosterStatus.PRACTICE_SQUAD,
+                                        free_agent=status == RosterStatus.FREE_AGENT)
+                attributes = generate_attributes(r["gsis_id"], pos, q, years_exp=exp, height_in=height, weight_lb=weight)
+                source = "provisional"
             players[r["gsis_id"]] = Player(
-                id=r["gsis_id"], name=r["name"], position=pos,
-                attributes=generate_attributes(r["gsis_id"], pos, q, years_exp=exp, height_in=height, weight_lb=weight),
+                id=r["gsis_id"], name=r["name"], position=pos, attributes=attributes,
                 birth_date=_date(r["birth_date"]), height_in=height, weight_lb=weight, college=r["college"] or None,
                 jersey=_int(r["jersey"]), years_exp=exp, draft_year=_int(r["draft_year"]),
                 draft_round=_int(r["draft_round"]), draft_pick=_int(r["draft_pick"]), draft_team=r["draft_team"] or None,
-                team=r["team"] or None, roster_status=status, ratings_source="provisional",
+                team=r["team"] or None, roster_status=status, ratings_source=source,
             )
 
     # 실제 뎁스차트 (53인 로스터에 있는 선수만)

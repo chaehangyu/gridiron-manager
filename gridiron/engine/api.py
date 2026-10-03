@@ -46,7 +46,7 @@ def simulate(league: League, game: ScheduledGame, seed: int, *, outcome: Outcome
     away = build_team(league, game.away, 1, day)
     if outcome is None:
         from .outcome.data_model import DataOutcome
-        outcome = DataOutcome()
+        outcome = DataOutcome.for_league(league)
     sim = GameSim([home, away], settings=settings or GameSettings.from_config(), outcome=outcome, seed=seed,
                   do_play_by_play=play_by_play, playoffs=game.game_type != "REG", neutral_site=game.neutral_site,
                   gid=game.game_id, venue={"roof": game.roof, "surface": game.surface},

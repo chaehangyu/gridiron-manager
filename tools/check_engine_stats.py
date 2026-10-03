@@ -1,7 +1,7 @@
 """엔진 리그 평균 통계 점검 (PRD §8.4 보정 목표와 비교).
 
-사용법: python tools/check_engine_stats.py [경기 수=500]
-샘플 리그로 경기를 돌려 득점·완성률·색 비율 등 리그 평균을 출력한다.
+사용법: python tools/check_engine_stats.py [경기 수=500] [모델=data|fbgm] [리그=sample|real:2026]
+리그 경기를 돌려 득점·완성률·색 비율 등 리그 평균을 출력한다.
 """
 from gridiron.engine.skeleton.settings import GameSettings
 import sys, time
@@ -14,8 +14,14 @@ MODEL=sys.argv[2] if len(sys.argv)>2 else "data"
 from gridiron.engine.outcome.data_model import DataOutcome
 from gridiron.engine.outcome.fbgm import FbgmOutcome
 def outcome():
-    return DataOutcome() if MODEL=="data" else FbgmOutcome()
-L=generate_sample_league()
+    return DataOutcome.for_league(L) if MODEL=="data" else FbgmOutcome()
+SRC=sys.argv[3] if len(sys.argv)>3 else "sample"
+if SRC=="sample":
+    L=generate_sample_league()
+else:
+    from gridiron.data.real_league import load_real_league
+    L=load_real_league(int(SRC.split(":")[1]))
+L.schedule=[g for g in L.schedule if g.game_type=="REG"]
 from gridiron.engine.norms import compute_norms
 NORMS=compute_norms(L)
 tot=defaultdict(float); games=0; t0=time.time(); ties=0

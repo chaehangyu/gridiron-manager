@@ -72,7 +72,7 @@ def data_game(sample_league):
         abbrs = sorted(sample_league.teams)[:2]
         day = sample_league.season_start()
         teams = [build_team(sample_league, abbrs[0], 0, day), build_team(sample_league, abbrs[1], 1, day)]
-        return GameSim(teams, settings=GameSettings.from_config(), outcome=outcome or DataOutcome(), seed=seed,
+        return GameSim(teams, settings=GameSettings.from_config(), outcome=outcome or DataOutcome.for_league(sample_league), seed=seed,
                        norms=norms)
 
     return make
@@ -122,7 +122,8 @@ def test_league_averages_in_broad_bands(sample_league):
     for i in range(n):
         g = sample_league.schedule[i]
         res = GameSim([build_team(sample_league, g.home, 0, g.gameday), build_team(sample_league, g.away, 1, g.gameday)],
-                      settings=GameSettings.from_config(), outcome=DataOutcome(), seed=i, norms=norms).run()
+                      settings=GameSettings.from_config(), outcome=DataOutcome.for_league(sample_league), seed=i,
+                      norms=norms).run()
         for t in res["team"]:
             for k in ("pts", "pss", "pssCmp", "pssSk", "rus", "rusYds", "pssInt"):
                 tot[k] += t.stat[k]

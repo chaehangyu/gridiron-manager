@@ -1,6 +1,8 @@
 # 실측 결과 모델(DataOutcome) 파라미터 — ENGINE_DESIGN §5, §9
 # 능력치 차이 Δ = 공격 유닛 − 수비 유닛 (포지션별 주전 평균·표준편차 기준 표준점수).
 # 계수는 "주전 표준편차 1만큼 차이"당 효과이며, M3에서 2025 재현 테스트로 적합한다 (초기값).
+# 모든 β에 곱하는 배율. 2025 재현 테스트(tools/reproduce_season.py)에서 팀 득실차 분산이 실제와 같아지는 값으로 적합.
+beta_scale: 1.25
 beta:
   pressure: 0.30        # 패스 러시 vs 패스 블록 → 압박 로짓
   sack: 0.30            # 압박 시 QB 포켓 감각·회피 → 색 로짓 (음수 방향)
@@ -31,13 +33,23 @@ decisions:
   expected_kickoff_start: 30      # 상대 킥오프 후 평균 시작 위치 (자기 진영, 2025 규칙)
 # 평균 매치업 중심 보정: 평균적인 두 팀이 붙을 때 Δ 평균이 0이 되도록 뺀다.
 # (필드에는 주전이 백업보다 자주 서고, 타깃은 좋은 리시버에게 몰린다 — 실측 분포에 이미 들어 있는 선택 효과)
-# 측정: python tools/calibrate_centers.py 200 (샘플 리그). 실데이터 능력치(M3) 도입 후 다시 측정한다.
+# 측정: python tools/calibrate_centers.py 400 real:2026  (능력치를 다시 산출하면 다시 잰다)
 center:
-  rush: 0.295
-  pass: 0.152
-  int: -0.299
-  yac: 0.322
+  rush: 0.043
+  pass: 0.056
+  int: -0.431
+  yac: 0.096
   pocket: -0.011
-  mobility: -0.030
-  run: 0.207
-  scramble: 0.062
+  mobility: -0.021
+  run: 0.043
+  scramble: 0.137
+# 가상 샘플 리그(임시 생성 능력치)용: python tools/calibrate_centers.py 400 sample
+center_sample:
+  rush: 0.275
+  pass: 0.135
+  int: -0.293
+  yac: 0.309
+  pocket: -0.011
+  mobility: -0.026
+  run: 0.212
+  scramble: 0.108

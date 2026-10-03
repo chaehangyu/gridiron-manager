@@ -1,0 +1,355 @@
+{
+ "target_season": 2025,
+ "history_seasons": {
+  "2024": 1.0,
+  "2023": 0.7,
+  "2022": 0.45
+ },
+ "rapm": {
+  "pressure": {
+   "alpha": 300,
+   "plays": 57995,
+   "players": 2965
+  },
+  "run": {
+   "alpha": 1000,
+   "plays": 38920,
+   "players": 3068
+  },
+  "coverage": {
+   "alpha": 1000,
+   "plays": 57844,
+   "players": 4266
+  },
+  "coverage_all": {
+   "alpha": 1000,
+   "plays": 60137,
+   "players": 2974
+  }
+ },
+ "shrink_k": {
+  "C": {
+   "rapm_pressure_off": 250.0,
+   "rapm_run_off": 250.0
+  },
+  "CB": {
+   "ball_prod": 4094.27,
+   "int_rate": 5050.45,
+   "kick_return": 88.27,
+   "punt_return": 30.62,
+   "pursuit_tkl": 1309.15,
+   "rapm_cov_all": 250.0,
+   "rapm_cov_man": null,
+   "rapm_cov_zone": null,
+   "rapm_run_def": 250.0,
+   "run_stop_tkl": 186.81,
+   "tackle_rate": 535.89
+  },
+  "DT": {
+   "pursuit_tkl": 5451.41,
+   "rapm_pressure_def": 250.0,
+   "rapm_run_def": 250.0,
+   "run_stop_tkl": 315.12,
+   "rush_prod": 404.05,
+   "tackle_rate": 573.98,
+   "tfl_rate": 1060.09
+  },
+  "EDGE": {
+   "pursuit_tkl": 1147.89,
+   "rapm_cov_man": null,
+   "rapm_cov_zone": null,
+   "rapm_pressure_def": 250.0,
+   "rapm_run_def": 250.0,
+   "run_stop_tkl": 450.29,
+   "rush_prod": 737.68,
+   "tackle_rate": 869.77,
+   "tfl_rate": 1106.05
+  },
+  "FB": {
+   "catch_oe": 158.73,
+   "drop_rate": 29.69,
+   "rapm_pressure_off": 250.0,
+   "rapm_run_off": 250.0,
+   "short_conv": 130.29
+  },
+  "K": {
+   "fg_long_oe": 60.98,
+   "fg_long_share": 615.73,
+   "fg_oe": 454.51,
+   "xp_rate": 704.72
+  },
+  "LB": {
+   "ball_prod": 5673.2,
+   "int_rate": 7783.54,
+   "pursuit_tkl": 684.56,
+   "rapm_cov_all": 250.0,
+   "rapm_cov_man": null,
+   "rapm_cov_zone": null,
+   "rapm_pressure_def": 250.0,
+   "rapm_run_def": 250.0,
+   "run_stop_tkl": 339.73,
+   "rush_prod": 513.78,
+   "tackle_rate": 373.17,
+   "tfl_rate": 696.32
+  },
+  "OG": {
+   "rapm_pressure_off": 250.0,
+   "rapm_run_off": 250.0
+  },
+  "OT": {
+   "rapm_pressure_off": 250.0,
+   "rapm_run_off": 250.0
+  },
+  "P": {
+   "punt_gross": 27.58,
+   "punt_pin": 457.83
+  },
+  "QB": {
+   "cpoe_deep": 413.21,
+   "cpoe_med": 577.46,
+   "cpoe_on_run": 451.25,
+   "cpoe_short": 357.07,
+   "deep_share": 320.18,
+   "itw_rate": 535.25,
+   "max_air": 0.41,
+   "qb_epa": 184.71,
+   "qb_epa_clutch": 501.04,
+   "qb_fault_sack": 518.22,
+   "qb_fumble": 929.95,
+   "sack_when_pressured": 61.24,
+   "scramble_yds": 287.5
+  },
+  "RB": {
+   "catch_oe": 386.51,
+   "drop_rate": 120.33,
+   "explosive_run": 907.3,
+   "fumble_rate": 235.76,
+   "kick_return": 18.18,
+   "no_stuff": 344.82,
+   "punt_return": 332.4,
+   "rapm_pressure_off": 250.0,
+   "rapm_run_off": 250.0,
+   "run_success": 455.56,
+   "ryoe": 9.21,
+   "short_conv": 339.55,
+   "tprr": 142.84,
+   "yac_oe": 267.17,
+   "yprr": 304.75
+  },
+  "S": {
+   "ball_prod": 3435.55,
+   "int_rate": 2034.9,
+   "kick_return": 15.74,
+   "punt_return": 199.07,
+   "pursuit_tkl": 2056.41,
+   "rapm_cov_all": 250.0,
+   "rapm_cov_man": null,
+   "rapm_cov_zone": null,
+   "rapm_run_def": 250.0,
+   "run_stop_tkl": 220.91,
+   "tackle_rate": 662.73
+  },
+  "TE": {
+   "catch_oe": 295.03,
+   "contested_rate": 116.59,
+   "drop_rate": 195.51,
+   "fumble_rate": 599.24,
+   "rapm_pressure_off": 250.0,
+   "rapm_run_off": 250.0,
+   "separation": 4.17,
+   "tprr": 65.33,
+   "tprr_man": 53.3,
+   "yac_oe": 146.2,
+   "yprr": 131.87
+  },
+  "WR": {
+   "catch_oe": 437.11,
+   "contested_rate": 195.22,
+   "drop_rate": 600.27,
+   "fumble_rate": 611.75,
+   "kick_return": 8.95,
+   "punt_return": 339.41,
+   "separation": 3.87,
+   "tprr": 63.7,
+   "tprr_man": 46.5,
+   "yac_oe": 57.98,
+   "yprr": 130.72
+  },
+  "ALL": {
+   "missed_rate": 9.78,
+   "q_played": 5.97,
+   "out_streak": 3.58
+  }
+ },
+ "physical": {
+  "top_compression": {
+   "speed": 0.925,
+   "strength": 0.925,
+   "jumping": 0.937,
+   "agility": 1.0,
+   "acceleration": 0.987
+  },
+  "recalibrated_anchors": {
+   "forty": {
+    "20": 4.28,
+    "18": 4.34,
+    "16": 4.43,
+    "14": 4.51,
+    "12": 4.62,
+    "10": 4.75,
+    "8": 4.9,
+    "6": 5.05,
+    "4": 5.2,
+    "1": 5.4
+   },
+   "bench": {
+    "20": 40.0,
+    "18": 36.22,
+    "16": 31.65,
+    "14": 27.32,
+    "12": 23.0,
+    "10": 20.0,
+    "8": 16.0,
+    "6": 12.0,
+    "4": 8.0,
+    "1": 4.0
+   }
+  }
+ },
+ "calibration": {
+  "C": {
+   "tech_shift": 2.94,
+   "top_compression": 1.0
+  },
+  "CB": {
+   "tech_shift": -0.1,
+   "top_compression": 1.0
+  },
+  "DT": {
+   "tech_shift": 0.78,
+   "top_compression": 1.0
+  },
+  "EDGE": {
+   "tech_shift": 0.61,
+   "top_compression": 1.0
+  },
+  "FB": {
+   "tech_shift": 3.19,
+   "top_compression": 1.0
+  },
+  "K": {
+   "tech_shift": 2.07,
+   "top_compression": 0.859
+  },
+  "LB": {
+   "tech_shift": 2.59,
+   "top_compression": 1.0
+  },
+  "OG": {
+   "tech_shift": 2.27,
+   "top_compression": 1.0
+  },
+  "OT": {
+   "tech_shift": 3.7,
+   "top_compression": 1.0
+  },
+  "P": {
+   "tech_shift": 2.12,
+   "top_compression": 1.0
+  },
+  "QB": {
+   "tech_shift": 0.68,
+   "top_compression": 1.0
+  },
+  "RB": {
+   "tech_shift": 0.68,
+   "top_compression": 1.0
+  },
+  "S": {
+   "tech_shift": 0.31,
+   "top_compression": 1.0
+  },
+  "TE": {
+   "tech_shift": 2.78,
+   "top_compression": 1.0
+  },
+  "WR": {
+   "tech_shift": -0.19,
+   "top_compression": 1.0
+  },
+  "league_top_compression": {
+   "consistency": 0.85,
+   "ball_security": 0.851,
+   "catching": 0.85,
+   "contested_catch": 0.85,
+   "run_block": 0.85,
+   "pass_block": 0.85,
+   "power_rush": 0.85,
+   "block_shedding": 0.85,
+   "run_stop": 0.85,
+   "tackling": 0.85
+  }
+ },
+ "validation": {
+  "starter_pr_mean": {
+   "C": 12.93,
+   "CB": 13.0,
+   "DT": 12.97,
+   "EDGE": 12.98,
+   "FB": 13.27,
+   "K": 12.67,
+   "LB": 12.96,
+   "LS": 9.69,
+   "OG": 12.96,
+   "OT": 12.9,
+   "P": 13.0,
+   "QB": 13.0,
+   "RB": 13.0,
+   "S": 12.99,
+   "TE": 12.97,
+   "WR": 12.99
+  },
+  "elite_pr17": {
+   "C": 0,
+   "CB": 1,
+   "DT": 0,
+   "EDGE": 0,
+   "FB": 0,
+   "K": 3,
+   "LB": 0,
+   "LS": 0,
+   "OG": 0,
+   "OT": 0,
+   "P": 2,
+   "QB": 0,
+   "RB": 0,
+   "S": 1,
+   "TE": 0,
+   "WR": 0
+  },
+  "twenty_counts": {
+   "agility": 2,
+   "composure": 1,
+   "determination": 1,
+   "throw_power": 1,
+   "short_accuracy": 1,
+   "medium_accuracy": 1,
+   "deep_accuracy": 1,
+   "throw_on_run": 1,
+   "pocket_presence": 1,
+   "decision": 1,
+   "vision": 3,
+   "elusiveness": 1,
+   "break_tackle": 3,
+   "route_running": 3,
+   "release": 3,
+   "finesse_rush": 2,
+   "pursuit": 1,
+   "zone_coverage": 3,
+   "ball_skills": 1,
+   "punt_power": 3,
+   "punt_accuracy": 1
+  },
+  "pass": true
+ }
+}

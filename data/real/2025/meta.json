@@ -1,0 +1,14 @@
+{
+  "season": 2025,
+  "roster_week": 1,
+  "depth_chart_snapshot": "2025-09-03",
+  "first_game_day": "2025-09-04",
+  "fetched_at": "2026-10-03T07:46:35+00:00",
+  "source": "nflverse via nflreadpy",
+  "counts": {
+    "players": 3026,
+    "depth_rows": 2129,
+    "games": 285,
+    "teams": 32
+  }
+}

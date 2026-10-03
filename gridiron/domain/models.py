@@ -51,7 +51,7 @@ class Player:
     roster_status: RosterStatus = RosterStatus.ACTIVE
     condition: float = 100.0   # 주간 컨디션 0–100
     injury: Injury | None = None
-    ratings_source: str = "provisional"  # provisional | pipeline | manual
+    ratings_source: str = "provisional"  # provisional | measured:measured | measured:prior | sample
 
     def __post_init__(self) -> None:
         missing = [k for k in ATTR_KEYS if k not in self.attributes]
