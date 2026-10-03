@@ -12,6 +12,21 @@ from .attributes import ATTR_KEYS, clamp
 from .positions import Front, Position, all_slots
 
 
+def _tactics():
+    from ..tactics.model import Tactics
+    return Tactics()
+
+
+def _familiarity():
+    from ..tactics.familiarity import default
+    return default()
+
+
+def _training():
+    from ..tactics.training import TrainingPlan
+    return TrainingPlan()
+
+
 class RosterStatus(str, Enum):
     ACTIVE = "active"            # 53인 로스터
     PRACTICE_SQUAD = "practice_squad"
@@ -81,6 +96,19 @@ class Team:
     front: Front = Front.FOUR_THREE
     # 슬롯 → 선수 id 순번 목록 (0번이 주전)
     depth_chart: dict[str, list[str]] = field(default_factory=dict)
+    # ── 전술·주간 준비 (PRD F4·F11, M4) ──
+    tactics: "Tactics" = field(default_factory=lambda: _tactics())
+    gameplan: dict = field(default_factory=dict)          # 이번 주 게임플랜 (부분 덮어쓰기)
+    gameplan_week: int | None = None
+    familiarity: dict[str, float] = field(default_factory=lambda: _familiarity())
+    training: "TrainingPlan" = field(default_factory=lambda: _training())
+    prep: dict = field(default_factory=dict)              # 이번 주 훈련이 만든 경기 준비값
+    usage: dict[str, float] = field(default_factory=dict)  # 최근 경기 영역 사용량 (숙련도 감소 판단)
+    scouting: dict = field(default_factory=dict)          # 이번 시즌 콜 성향 누적 (상대가 본다)
+    last_tendency: dict | None = None                     # 지난 시즌 실측 성향
+
+    def tactics_for_week(self, week: int) -> "Tactics":
+        return self.tactics.merged(self.gameplan if self.gameplan_week == week else None)
 
     @property
     def name(self) -> str:
@@ -121,6 +149,8 @@ class League:
     week: int = 1
     phase: str = "regular"
     source: str = "sample"  # sample | nflverse
+    league_tendency: dict | None = None   # 지난 시즌 리그 평균 성향 (team_tendencies.json의 league)
+    prepared_week: int = 0                # 주간 훈련을 적용한 마지막 주
 
     def roster(self, abbr: str, statuses: tuple[RosterStatus, ...] = (RosterStatus.ACTIVE,)) -> list[Player]:
         return [p for p in self.players.values() if p.team == abbr and p.roster_status in statuses]

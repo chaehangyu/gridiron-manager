@@ -1,0 +1,221 @@
+{
+ "teams": [
+  "ATL",
+  "PHI"
+ ],
+ "T1": {
+  "games": 1200,
+  "sim": {
+   "run_epa_by_box": {
+    "light": -0.0449,
+    "normal": -0.0967,
+    "heavy": -0.1142
+   },
+   "dropback_epa_pressure": {
+    "0": 0.2163,
+    "1": -0.4351
+   },
+   "pressure_by_blitz": {
+    "0": 0.2791,
+    "1": 0.4116
+   },
+   "quick_share": {
+    "C1": 0.3631,
+    "C2": 0.5112
+   },
+   "deep_share": {
+    "C0": 0.1431,
+    "C2": 0.1568
+   },
+   "dropback_epa_by_xpass": {
+    "lo": 0.0412,
+    "mid": 0.0554,
+    "hi": -0.0403
+   },
+   "heavy_box_by_pers": {
+    "11": 0.0759,
+    "12": 0.1719,
+    "13": 0.2277
+   }
+  },
+  "real": {
+   "run_epa_by_box": {
+    "light": -0.052,
+    "normal": -0.093,
+    "heavy": -0.101
+   },
+   "dropback_epa_pressure": {
+    "0.0": 0.236,
+    "1.0": -0.481
+   },
+   "pressure_by_blitz": {
+    "0": 0.262,
+    "1": 0.393
+   },
+   "quick_share": {
+    "C1": 0.361,
+    "C2": 0.494
+   },
+   "deep_share": {
+    "C0": 0.13,
+    "C2": 0.149
+   },
+   "dropback_epa_by_xpass": {
+    "lo": 0.103,
+    "mid": 0.093,
+    "hi": 0.017
+   },
+   "heavy_box_by_pers": {
+    "11": 0.061,
+    "12": 0.146,
+    "13": 0.237
+   }
+  }
+ },
+ "T2": {
+  "sim_slope": -0.0815,
+  "real_slope": -0.086,
+  "ratio": 0.95,
+  "pass": true
+ },
+ "T3": {
+  "strong_ol_run_epa": {
+   "outside_zone": 0.073,
+   "gap": 0.1573
+  },
+  "run_diff_gap_minus_zone": 0.0843,
+  "man_cb_pass_epa_allowed": {
+   "tampa2": 0.1582,
+   "man_blitz": -0.1341
+  },
+  "pass_diff_zone_minus_man": 0.2923,
+  "pass": true
+ },
+ "T4": {
+  "learning": {
+   "first_half": 0.0401,
+   "second_half": 0.0015,
+   "diff": -0.0386,
+   "se_diff": 0.0096,
+   "pass_rate": 0.8809
+  },
+  "control": {
+   "first_half": 0.0493,
+   "second_half": 0.0357,
+   "diff": -0.0136,
+   "se_diff": 0.0096,
+   "pass_rate": 0.8791
+  },
+  "excess_drop": -0.025,
+  "pass": true
+ },
+ "T5": {
+  "curves": {
+   "average": {
+    "0.15": 0.036,
+    "0.25": 0.0336,
+    "0.35": 0.0363,
+    "0.45": 0.0424,
+    "0.55": 0.0369,
+    "0.7": 0.0353
+   },
+   "elite_run_weak_qb": {
+    "0.15": -0.0789,
+    "0.25": -0.054,
+    "0.35": -0.0416,
+    "0.45": -0.0168,
+    "0.55": 0.0075,
+    "0.7": 0.0155
+   }
+  },
+  "best": {
+   "average": 0.454,
+   "elite_run_weak_qb": 0.7
+  },
+  "pass": false
+ },
+ "T6": {
+  "win_rate": {
+   "west_coast+tampa2": 0.427,
+   "west_coast+man_blitz": 0.564,
+   "west_coast+quarters": 0.497,
+   "air_raid+tampa2": 0.468,
+   "air_raid+man_blitz": 0.558,
+   "air_raid+quarters": 0.474,
+   "ground_pound+tampa2": 0.455,
+   "ground_pound+man_blitz": 0.509,
+   "ground_pound+quarters": 0.445,
+   "wide_zone+tampa2": 0.5,
+   "wide_zone+man_blitz": 0.605,
+   "wide_zone+quarters": 0.499
+  },
+  "max": 0.605,
+  "lopsided_pairs": {
+   "west_coast+quarters vs west_coast+tampa2": 0.725,
+   "air_raid+man_blitz vs west_coast+tampa2": 0.65,
+   "west_coast+tampa2 vs wide_zone+man_blitz": 0.25,
+   "west_coast+man_blitz vs west_coast+quarters": 0.65,
+   "air_raid+quarters vs west_coast+man_blitz": 0.3,
+   "west_coast+quarters vs wide_zone+man_blitz": 0.35,
+   "west_coast+quarters vs wide_zone+quarters": 0.35,
+   "air_raid+tampa2 vs wide_zone+man_blitz": 0.35,
+   "air_raid+man_blitz vs ground_pound+tampa2": 0.65,
+   "air_raid+man_blitz vs wide_zone+quarters": 0.65,
+   "ground_pound+quarters vs wide_zone+man_blitz": 0.275
+  },
+  "pass": false
+ },
+ "T7": {
+  "familiarity_by_week": [
+   {
+    "cov_man": 55.0,
+    "blitz": 60.0
+   },
+   {
+    "cov_man": 62.0,
+    "blitz": 63.5
+   },
+   {
+    "cov_man": 69.0,
+    "blitz": 67.0
+   },
+   {
+    "cov_man": 72.5,
+    "blitz": 74.0
+   },
+   {
+    "cov_man": 79.5,
+    "blitz": 77.5
+   },
+   {
+    "cov_man": 83.0,
+    "blitz": 84.5
+   }
+  ],
+  "pass_epa_allowed_by_week": {
+   "0": 0.027,
+   "1": 0.0201,
+   "2": 0.0115,
+   "3": 0.0033,
+   "4": -0.0171,
+   "5": -0.0091,
+   "baseline": -0.0086
+  },
+  "deficit_week0": 0.0356,
+  "deficit_week3": 0.0119,
+  "pass": true
+ },
+ "T8": {
+  "plays_checked": 4494,
+  "max_abs_error": 0.0001,
+  "pass": true
+ },
+ "T9": {
+  "sec_per_game": {
+   "off": 0.063,
+   "on": 0.0688
+  },
+  "increase": 0.092,
+  "pass": true
+ }
+}

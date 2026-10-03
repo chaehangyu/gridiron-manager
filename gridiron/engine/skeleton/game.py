@@ -770,7 +770,7 @@ class GameSim:
             p = self.pickPlayer(self.d, "passRushing" if self.rng.random() < 0.5 else "runStopping")
         self.currentPlay.addEvent({"type": "defSft", "p": p})
 
-    def doSack(self, qb: PlayerGameSim, pbw: dict, yds: int | None = None) -> float:
+    def doSack(self, qb: PlayerGameSim, pbw: dict, yds: int | None = None, extra: dict | None = None) -> float:
         d = self.currentPlay.state["initial"].d
         p = self.pickPlayer(d, "passRushing", None, 5)
         yds = self.currentPlay.boundedYds(self.rng.rand_int(-1, -12) if yds is None else min(0, yds))
@@ -783,7 +783,8 @@ class GameSim:
         if info["safety"]:
             self.doSafety(p)
         self.playByPlay.logEvent({"type": "sack", "names": [qb.name, p.name], "safety": info["safety"],
-                                  "t": self.currentPlay.state["initial"].o, "yds": yds})
+                                  "t": self.currentPlay.state["initial"].o, "yds": yds,
+                                  **{f"x_{k}": v for k, v in (extra or {}).items()}})
         return float(self.rng.rand_int(3, 8))
 
     def _call(self, kind: str) -> dict | None:
@@ -799,13 +800,14 @@ class GameSim:
         plan = self.outcome.pass_play(self)
         qb = self.getTopPlayerOnField(o, "QB")
         self.currentPlay.addEvent({"type": "dropback", "pbw": plan.pbw})
-        self.playByPlay.logEvent({"type": "dropback", "names": [qb.name], "t": o})
+        self.playByPlay.logEvent({"type": "dropback", "names": [qb.name], "t": o,
+                                  **{f"x_{k}": v for k, v in plan.extra.items()}})
         dt = float(self.rng.rand_int(2, 6))
 
         if plan.qb_fumble:
             return dt + self.doFumble(qb, self.currentPlay.boundedYds(plan.qb_fumble_yds))
         if plan.sack:
-            return self.doSack(qb, plan.pbw, plan.extra.get("sack_yds"))
+            return self.doSack(qb, plan.pbw, plan.extra.get("sack_yds"), plan.extra)
         if plan.scramble:
             return self.doRun(True)
 
@@ -898,7 +900,10 @@ class GameSim:
         if max_allowed <= 0:
             return False
         rate = self.settings.foul_rate_factor
-        called = [pen for pen in PENALTIES_BY_PLAY_TYPE[play_type] if rng.random() < pen.prob_per_play * rate]
+        factor = getattr(self.outcome, "penalty_factor", None)
+        side_rate = {s: rate * (factor(self, s) if factor else 1.0) for s in ("offense", "defense")}
+        called = [pen for pen in PENALTIES_BY_PLAY_TYPE[play_type]
+                  if rng.random() < pen.prob_per_play * side_rate.get(pen.side, rate)]
         if not called:
             return False
         if len(called) > max_allowed:

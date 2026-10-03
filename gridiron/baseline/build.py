@@ -217,7 +217,8 @@ def build(cache: Path, out: Path) -> dict:
                 "scramble": round(float((s.qb_scramble == 1).mean()), 4),
                 "throwaway": round(float((s.is_throw_away == True).mean()), 4)}  # noqa: E712
 
-    T["dropback_branch"] = grouped_table(db, ["pressure", "blitz"], branch, MIN_N_RATE)
+    # 패싱 다운(2nd·3rd·4th & 긴 거리)에서는 QB가 퍼스트다운 선까지 버티느라 색이 늘어난다 (M4에서 추가)
+    T["dropback_branch"] = grouped_table(db, ["pressure", "passing_down", "blitz"], branch, MIN_N_RATE)
 
     # 커버리지·압박이 실제 던진 깊이를 바꾸는 비율 (E5)
     thrown = db[db.depth.notna()]
@@ -237,7 +238,8 @@ def build(cache: Path, out: Path) -> dict:
         return {"n": int(len(s)), "cmp": round(float(s.complete_pass.mean()), 4),
                 "int": round(float(s.interception.mean()), 4)}
 
-    T["pass_rates"] = grouped_table(tgt, ["depth", "pressure", "zone2", "pa", "covg"], pass_rates, MIN_N_RATE)
+    T["pass_rates"] = grouped_table(tgt, ["depth", "passing_down", "pressure", "zone2", "pa", "covg"], pass_rates,
+                                    MIN_N_RATE)
     comp = tgt[(tgt.complete_pass == 1) & (tgt.fumble != 1)]
     T["pass_air"] = grouped_table(comp, ["depth", "zone2", "pa", "covg"], lambda s: quantiles(s.air_yards), MIN_N_QUANT)
     T["pass_yac"] = grouped_table(comp[comp.yards_after_catch.notna()], ["depth", "zone2", "covg"],

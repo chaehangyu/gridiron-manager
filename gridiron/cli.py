@@ -1,7 +1,10 @@
-"""명령줄 도구 (M0–M1). 웹 UI(M6) 전까지 리그를 만들고 경기를 돌려보는 용도.
+"""명령줄 도구. 웹 UI(M6) 전까지 리그를 만들고 경기를 돌려보는 용도.
 
     gridiron fetch-data --season 2026
     gridiron new-game --source real --team KC --save saves/career.sqlite
+    gridiron tactics --save saves/career.sqlite                     # 전술·숙련도·궁합 (cli_tactics 참고)
+    gridiron gameplan --save saves/career.sqlite                    # 다음 상대 스카우팅 + 이번 주 조정
+    gridiron train --save saves/career.sqlite                       # 주간 훈련
     gridiron sim-game --save saves/career.sqlite --team KC --pbp
     gridiron sim-week --save saves/career.sqlite
     gridiron standings --save saves/career.sqlite
@@ -74,9 +77,23 @@ def cmd_new(args) -> None:
     print(f"새 게임 저장: {args.save} ({league.source}, {league.season} 시즌, 팀 {t.name if t else '-'})")
 
 
-def cmd_sim_game(args) -> None:
-    from .db.store import load_league, record_game
+def _play(path: Path, league: League, game: ScheduledGame, user_team: str | None, pbp: bool, seed: int | None = None):
+    """경기 하나: 주간 훈련 적용(주 첫 경기) → 시뮬 → 저장 → 숙련도·스카우팅·컨디션 갱신 (M4)."""
+    from .db.store import record_game, save_team_state
     from .engine.api import simulate
+    from .season.weekly import after_game, prepare_week
+    prepare_week(league, game.week)
+    out = simulate(league, game, seed=seed if seed is not None else _seed_for(game), play_by_play=pbp,
+                   user_team=user_team)
+    record_game(path, game, {"overtimes": out.overtimes}, out.seed, out.box, tactics=out.tactics)
+    after_game(league, out.tactics, out.box["players"])
+    save_team_state(path, league)
+    return out
+
+
+def cmd_sim_game(args) -> None:
+    from .cli_tactics import print_game_tactics
+    from .db.store import load_league
     from .engine.commentary import render_game
     path = Path(args.save)
     league, user_team = load_league(path)
@@ -88,25 +105,23 @@ def cmd_sim_game(args) -> None:
         game = next((g for g in league.games_in_week(week) if team in (g.home, g.away) and not g.played), None)
         if game is None:
             sys.exit(f"{week}주차에 {team}의 남은 경기가 없습니다 (바이위크이거나 이미 치렀습니다).")
-    out = simulate(league, game, seed=args.seed if args.seed is not None else _seed_for(game), play_by_play=True)
+    out = _play(path, league, game, user_team, True, args.seed)
     if args.pbp:
         for line in render_game(out.play_by_play, [game.home, game.away]):
             print(line)
     _print_box(out, league)
-    record_game(path, game, {"overtimes": out.overtimes}, out.seed, out.box)
+    print_game_tactics(out, league, team)
 
 
 def cmd_sim_week(args) -> None:
-    from .db.store import load_league, record_game, set_week
-    from .engine.api import simulate
+    from .db.store import load_league, set_week
     path = Path(args.save)
     league, user_team = load_league(path)
     week = args.week or league.week
     games = [g for g in league.games_in_week(week) if not g.played]
     print(f"{league.season} 시즌 {week}주차 — {len(games)}경기")
     for g in games:
-        out = simulate(league, g, seed=_seed_for(g), play_by_play=False)
-        record_game(path, g, {"overtimes": out.overtimes}, out.seed, out.box)
+        out = _play(path, league, g, user_team, False)
         mark = " ◀" if user_team in (g.home, g.away) else ""
         ot = " (OT)" if out.overtimes else ""
         print(f"  {g.away:>3} {out.away_score:>2} @ {g.home:<3} {out.home_score:>2}{ot}{mark}")
@@ -172,6 +187,32 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--save", default="saves/career.sqlite")
     p.add_argument("--week", type=int)
     p.set_defaults(func=cmd_sim_week)
+
+    from .cli_tactics import cmd_gameplan, cmd_tactics, cmd_train
+    p = sub.add_parser("tactics", help="전술 보기·변경 (PRD F4)")
+    p.add_argument("--save", default="saves/career.sqlite")
+    p.add_argument("--team")
+    p.add_argument("--preset", help="공격+수비 프리셋 (예: west_coast+tampa2)")
+    p.add_argument("--set", nargs="+", help="경로=값 (예: offense.run_share=0.45 defense.blitz=1.3)")
+    p.add_argument("--situ", nargs="+", help='상황 키와 값 (예: "3l|opp" pass=0.15 blitz=1.5)')
+    p.add_argument("--clear-situ", action="store_true")
+    p.add_argument("--preview", action="store_true", help="저장하지 않고 궁합 변화만 보기")
+    p.set_defaults(func=cmd_tactics)
+
+    p = sub.add_parser("gameplan", help="다음 상대 스카우팅 리포트와 이번 주 게임플랜 (F4-7)")
+    p.add_argument("--save", default="saves/career.sqlite")
+    p.add_argument("--team")
+    p.add_argument("--set", nargs="+")
+    p.add_argument("--clear", action="store_true")
+    p.set_defaults(func=cmd_gameplan)
+
+    p = sub.add_parser("train", help="주간 훈련 초점·강도와 숙련도 (F11)")
+    p.add_argument("--save", default="saves/career.sqlite")
+    p.add_argument("--team")
+    p.add_argument("--main", help="주 초점 (familiarity:<영역|auto>, opponent, redzone, third_down, two_minute, special, recovery)")
+    p.add_argument("--sub", help="보조 초점 (none이면 없음)")
+    p.add_argument("--intensity", choices=["light", "normal", "hard"])
+    p.set_defaults(func=cmd_train)
 
     p = sub.add_parser("standings", help="순위표")
     p.add_argument("--save", default="saves/career.sqlite")

@@ -128,6 +128,9 @@ def generate_sample_league(seed: int = 2026, season: int = 2026, num_teams: int 
 
     league = League(season=season, teams=teams, players=players, source="sample")
     league.schedule = simple_schedule(list(teams), season, rng)
+    from ..tactics import familiarity
+    for t in teams.values():
+        t.familiarity = familiarity.initial(t.front.value, None, None)
     return league
 
 

@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import csv
+import json
 from datetime import date
 from pathlib import Path
 
@@ -108,4 +109,23 @@ def load_real_league(season: int = 2026, data_dir: Path | None = None) -> League
                 roof=r["roof"] or None, surface=r["surface"] or None, neutral_site=r["neutral_site"] == "1",
             ))
 
-    return League(season=season, teams=teams, players=players, schedule=schedule, source="nflverse")
+    league = League(season=season, teams=teams, players=players, schedule=schedule, source="nflverse")
+    apply_tendencies(league, base)
+    return league
+
+
+def apply_tendencies(league: League, base: Path) -> None:
+    """지난 시즌 실측 성향 → 팀 기본 전술(AI·사용자 시작값), 숙련도 시작값, 스카우팅 사전값 (M4)."""
+    from ..tactics import familiarity
+    from ..tactics.model import from_tendencies
+
+    path = base / "team_tendencies.json"
+    tend = json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
+    if tend:
+        league.league_tendency = tend["league"]
+    for t in league.teams.values():
+        last = tend["teams"].get(t.abbr) if tend else None
+        t.last_tendency = last
+        if last:
+            t.tactics = from_tendencies(last, tend["league"])
+        t.familiarity = familiarity.initial(t.front.value, last, tend["league"] if tend else None)

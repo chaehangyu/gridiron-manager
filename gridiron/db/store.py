@@ -48,6 +48,85 @@ def save_league(league: League, path: Path, user_team: str | None = None) -> Non
                             neutral_site=g.neutral_site, home_score=g.home_score, away_score=g.away_score,
                             status="final" if g.played else "scheduled"))
         s.commit()
+    save_team_state(path, league)
+
+
+LEAGUE_STATE = "__league__"
+
+
+def save_team_state(path: Path, league: League) -> None:
+    """전술·게임플랜·숙련도·훈련·팀 상태·선수 컨디션 저장 (M4). 같은 시즌·주차 값은 덮어쓴다."""
+    eng = engine_for(path)
+    season, week = league.season, league.week
+    with Session(eng) as s:
+        s.exec(delete(S.TacticsRow).where(S.TacticsRow.season == season))
+        s.exec(delete(S.FamiliarityRow).where((S.FamiliarityRow.season == season) & (S.FamiliarityRow.week == week)))
+        s.exec(delete(S.TrainingPlanRow).where((S.TrainingPlanRow.season == season) & (S.TrainingPlanRow.week == week)))
+        for t in league.teams.values():
+            s.add(S.TacticsRow(team=t.abbr, season=season, layer="base", week=0, payload=t.tactics.to_dict()))
+            if t.gameplan:
+                s.add(S.TacticsRow(team=t.abbr, season=season, layer="gameplan", week=t.gameplan_week or 0,
+                                   payload=t.gameplan))
+            s.add(S.TacticsRow(team=t.abbr, season=season, layer="state", week=0,
+                               payload={"usage": t.usage, "prep": t.prep, "last_tendency": t.last_tendency}))
+            for dim, v in t.familiarity.items():
+                s.add(S.FamiliarityRow(team=t.abbr, season=season, week=week, dimension=dim, value=v))
+            tp = t.training
+            s.add(S.TrainingPlanRow(team=t.abbr, season=season, week=week, main_focus=tp.main, sub_focus=tp.sub,
+                                    intensity=tp.intensity))
+        s.add(S.TacticsRow(team=LEAGUE_STATE, season=season, layer="state", week=0,
+                           payload={"prepared_week": league.prepared_week, "league_tendency": league.league_tendency}))
+        conds = {p.id: p.condition for p in league.players.values()}
+        for row in s.exec(select(S.PlayerRow)):
+            c = conds.get(row.id)
+            if c is not None and abs((row.condition or 0) - c) > 1e-9:
+                row.condition = c
+                s.add(row)
+        s.commit()
+
+
+def _load_team_state(s: Session, league: League) -> bool:
+    from ..tactics import scouting
+    from ..tactics.model import Tactics
+    from ..tactics.training import TrainingPlan
+
+    rows = list(s.exec(select(S.TacticsRow).where(S.TacticsRow.season == league.season)))
+    if not rows:
+        return False
+    for r in rows:
+        if r.team == LEAGUE_STATE:
+            league.prepared_week = r.payload.get("prepared_week", 0)
+            league.league_tendency = r.payload.get("league_tendency")
+            continue
+        t = league.teams.get(r.team)
+        if t is None:
+            continue
+        if r.layer == "base":
+            t.tactics = Tactics.from_dict(r.payload)
+        elif r.layer == "gameplan":
+            t.gameplan, t.gameplan_week = dict(r.payload), r.week
+        elif r.layer == "state":
+            t.usage = dict(r.payload.get("usage") or {})
+            t.prep = dict(r.payload.get("prep") or {})
+            t.last_tendency = r.payload.get("last_tendency")
+    fam_rows = s.exec(select(S.FamiliarityRow).where((S.FamiliarityRow.season == league.season)
+                                                     & (S.FamiliarityRow.player_id == None))  # noqa: E711
+                      .order_by(S.FamiliarityRow.week))
+    for r in fam_rows:
+        if r.team in league.teams:
+            league.teams[r.team].familiarity[r.dimension] = r.value
+    for r in s.exec(select(S.TrainingPlanRow).where(S.TrainingPlanRow.season == league.season)
+                    .order_by(S.TrainingPlanRow.week)):
+        if r.team in league.teams:
+            league.teams[r.team].training = TrainingPlan(main=r.main_focus, sub=r.sub_focus, intensity=r.intensity)
+    games = {g.game_id: g for g in league.schedule}
+    for r in s.exec(select(S.OpponentModelRow).where(S.OpponentModelRow.bucket == "summary")):
+        g = games.get(r.game_id)
+        t = league.teams.get(r.observer_team)
+        if g is None or t is None or g.season != league.season:
+            continue
+        t.scouting = scouting.accumulate(t.scouting or None, r.family_counts)
+    return True
 
 
 def load_league(path: Path) -> tuple[League, str | None]:
@@ -83,10 +162,21 @@ def load_league(path: Path) -> tuple[League, str | None]:
                     for r in s.exec(select(S.GameRow).order_by(S.GameRow.week, S.GameRow.gameday, S.GameRow.id))]
         league = League(season=meta.season, teams=teams, players=players, schedule=schedule, week=meta.week,
                         phase=meta.phase, source=meta.source)
+        if not _load_team_state(s, league):
+            # M3 이전 세이브: 실측 성향으로 전술·숙련도 시작값을 채운다
+            if league.source == "nflverse":
+                from ..config import DATA_DIR
+                from ..data.real_league import apply_tendencies
+                apply_tendencies(league, DATA_DIR / "real" / str(league.season))
+            else:
+                from ..tactics import familiarity
+                for t in league.teams.values():
+                    t.familiarity = familiarity.initial(t.front.value, None, None)
         return league, meta.user_team
 
 
-def record_game(path: Path, game: ScheduledGame, result: dict, seed: int, box: dict) -> None:
+def record_game(path: Path, game: ScheduledGame, result: dict, seed: int, box: dict,
+                tactics: dict | None = None) -> None:
     """경기 결과, 팀·선수 경기 기록, 플레이 로그를 저장하고 팀 시즌 성적을 갱신한다."""
     eng = engine_for(path)
     with Session(eng) as s:
@@ -94,8 +184,11 @@ def record_game(path: Path, game: ScheduledGame, result: dict, seed: int, box: d
         row.home_score, row.away_score = game.home_score, game.away_score
         row.status, row.seed, row.overtimes = "final", seed, result["overtimes"]
         s.add(row)
-        for model in (S.TeamGameStatsRow, S.PlayerGameStatsRow, S.PlayRow):
+        for model in (S.TeamGameStatsRow, S.PlayerGameStatsRow, S.PlayRow, S.OpponentModelRow):
             s.exec(delete(model).where(model.game_id == game.game_id))
+        for abbr, rep in (tactics or {}).items():
+            s.add(S.OpponentModelRow(game_id=game.game_id, observer_team=abbr, bucket="summary",
+                                     family_counts=rep["summary"]))
         for abbr, stats in box["teams"].items():
             s.add(S.TeamGameStatsRow(game_id=game.game_id, team=abbr, stats=stats))
         for pid, (abbr, stats) in box["players"].items():

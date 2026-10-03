@@ -132,11 +132,14 @@ def to_game_player(p: Player, engine_pos: str, on_day: date) -> PlayerGameSim:
     r = fbgm_ratings(p)
     comp = composite_ratings(r)
     ovrs = {pos: ovr(comp, pos, engine_pos) for pos in OVR_INFO}
+    # 주간 컨디션 85 이상은 영향 없음, 그 아래로 1점당 0.2% (PRD F2-4b)
+    cond = 1.0 - 0.002 * max(0.0, 85.0 - p.condition)
     return PlayerGameSim(id=p.id, name=p.name, pos=engine_pos, age=p.age_on(on_day), composite=comp, ovrs=ovrs,
-                         attributes=dict(p.attributes), playing_through_injury=p.injured)
+                         attributes=dict(p.attributes), playing_through_injury=p.injured, cond=cond)
 
 
-def build_team(league: League, abbr: str, team_num: int, on_day: date) -> TeamGameSim:
+def build_team(league: League, abbr: str, team_num: int, on_day: date, week: int | None = None,
+               ai_controlled: bool = True) -> TeamGameSim:
     from ..domain.positions import POSITION_TO_ENGINE
 
     team: Team = league.teams[abbr]
@@ -145,4 +148,6 @@ def build_team(league: League, abbr: str, team_num: int, on_day: date) -> TeamGa
     cache: dict[str, PlayerGameSim] = {p.id: to_game_player(p, POSITION_TO_ENGINE[p.position], on_day) for p in roster}
     depth_ids = engine_depth(team, {p.id: p for p in roster})
     depth = {pos: [cache[i] for i in ids if i in cache] for pos, ids in depth_ids.items()}
-    return TeamGameSim(id=team_num, abbr=abbr, players=list(cache.values()), depth=depth, front=team.front.value)
+    return TeamGameSim(id=team_num, abbr=abbr, players=list(cache.values()), depth=depth, front=team.front.value,
+                       tactics=team.tactics_for_week(week if week is not None else league.week),
+                       familiarity=dict(team.familiarity), prep=dict(team.prep), ai_controlled=ai_controlled)

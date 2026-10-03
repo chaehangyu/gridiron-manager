@@ -16,9 +16,9 @@ from gridiron.engine.skeleton.settings import GameSettings
 
 # ── 테이블 ─────────────────────────────────────────────────────────
 def test_lookup_falls_back_to_coarser_cell():
-    detailed = lookup("pass_rates", "deep", 1, "open", 0, "C0")
+    detailed = lookup("pass_rates", "deep", 0, 1, "open", 0, "C0")
     assert 0.2 < detailed["cmp"] < 0.5
-    coarse = lookup("pass_rates", "deep", 1, "open", 0, "NOPE")  # 없는 커버리지 → 상위 칸
+    coarse = lookup("pass_rates", "deep", 0, 1, "open", 0, "NOPE")  # 없는 커버리지 → 상위 칸
     assert coarse["n"] >= detailed["n"]
 
 

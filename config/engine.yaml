@@ -1,7 +1,7 @@
 # 실측 결과 모델(DataOutcome) 파라미터 — ENGINE_DESIGN §5, §9
 # 능력치 차이 Δ = 공격 유닛 − 수비 유닛 (포지션별 주전 평균·표준편차 기준 표준점수).
 # 계수는 "주전 표준편차 1만큼 차이"당 효과이며, M3에서 2025 재현 테스트로 적합한다 (초기값).
-# 모든 β에 곱하는 배율. 2025 재현 테스트(tools/reproduce_season.py)에서 팀 득실차 분산이 실제와 같아지는 값으로 적합.
+# 모든 β에 곱하는 배율. 2025 재현 테스트(tools/reproduce_season.py)에서 팀 득실차 분산이 실제와 같아지는 값으로 적합 (M3·M4 모두 1.25).
 beta_scale: 1.25
 beta:
   pressure: 0.30        # 패스 러시 vs 패스 블록 → 압박 로짓
@@ -35,21 +35,45 @@ decisions:
 # (필드에는 주전이 백업보다 자주 서고, 타깃은 좋은 리시버에게 몰린다 — 실측 분포에 이미 들어 있는 선택 효과)
 # 측정: python tools/calibrate_centers.py 400 real:2026  (능력치를 다시 산출하면 다시 잰다)
 center:
-  rush: 0.043
-  pass: 0.056
-  int: -0.431
-  yac: 0.096
-  pocket: -0.011
-  mobility: -0.021
-  run: 0.043
-  scramble: 0.137
+  rush: 0.037
+  pass: 0.122
+  int: -0.429
+  yac: 0.08
+  pocket: 0.017
+  mobility: -0.026
+  run: 0.012
+  scramble: 0.276
 # 가상 샘플 리그(임시 생성 능력치)용: python tools/calibrate_centers.py 400 sample
 center_sample:
-  rush: 0.275
-  pass: 0.135
-  int: -0.293
-  yac: 0.309
-  pocket: -0.011
-  mobility: -0.026
-  run: 0.212
-  scramble: 0.108
+  rush: 0.297
+  pass: 0.153
+  int: -0.298
+  yac: 0.297
+  pocket: -0.01
+  mobility: -0.037
+  run: 0.178
+  scramble: 0.102
+# 경기 중 학습 코디네이터 (ENGINE_DESIGN §6, M4). 단위: 기대 EPA(fit_*), Δ(gamma_*), 로짓(delta_obvious, kind_box_k)
+coordinator:
+  kappa: 20             # 사전 믿음 강도 (가상 플레이 수). 상대 분석 훈련으로 ×1.5
+  tau: 0.02             # 대응 정밀도 (EPA). AI 코디네이터는 팀별 0.01–0.04
+  fit_cov: 0.02         # 우리 커버리지 유닛이 맨/존에 맞는 정도(표준점수 1)당 콜 가치
+  fit_blitz: 0.015      # 블리처 패스 러시 표준점수 1당 블리츠 가치
+  fit_off: 0.02         # QB·리시버 깊이별 능력 표준점수 1당 패스 패밀리 가치
+  fit_floor: 0.15       # 대응 강도 0이어도 로스터 궁합에 따른 콜 조정은 이 강도로 남긴다
+  kind_box_k: 1.5       # 상대가 무거운 박스를 쓰는 정도 → 패스 확률 로짓
+  box_k: 1.0            # 런 예상 정도 → 박스를 한 단계 무겁게 할 확률
+  gamma_pass: 2.3       # 읽힘 효과: 패스 믿음 초과분 1당 패스 Δ 감소 (Δ 1 ≈ 패스 EPA 0.13 → 설계값 0.30 EPA)
+  gamma_run: 0.15       # 런은 읽혀도 손해가 작다 (E9)
+  read_threshold: 0.08  # 믿음이 중립보다 이만큼 넘게 치우친 부분에만 읽힘 효과 (G3: 최적 혼합이 극단으로 가지 않게)
+  delta_obvious: 3.0    # 뻔한 패스 상황(믿음 0.8 초과분) 압박 로짓 가산 (E9b)
+  bust_base: 0.03       # 숙련도 40일 때 커버리지 붕괴 확률
+  bust_size: 2.0        # 붕괴 시 패스 Δ 가산
+# 상황별 결과 보정 (M4). 실측 EPA(엔진과 같은 EP 모델)에 맞춘 이동값.
+#  pass: 다운·거리 → 에어·YAC 분위수 / pass_gs: 점수·시간(close 기준 0) / pass_fz: 필드 구역(opp 기준 0) / run: 다운·거리 → 런 야드
+# 측정: python tools/calibrate_situations.py 4 1600  (실제 2026 리그 기준. 기준 분포·능력치·중심값을 바꾸면 다시 잰다)
+situation_shift:
+  pass: {}
+  pass_gs: {"lead": 0.051, "trail": -0.096, "two_min": -0.103}
+  pass_fz: {"goal": -0.07, "red": 0.283}
+  run: {"1st": -0.054, "2l": -0.075, "2m": -0.075, "2s": -0.03, "3l": -0.022, "3m": -0.093, "3s": -0.192}

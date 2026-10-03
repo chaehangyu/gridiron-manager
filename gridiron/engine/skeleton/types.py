@@ -23,6 +23,7 @@ class PlayerGameSim:
     stat: defaultdict = field(default_factory=new_stat)
     season_stats: dict[str, float] = field(default_factory=dict)
     injured: bool = False
+    cond: float = 1.0             # 주간 컨디션 배율 (M4)
     new_injury: bool = False
     playing_through_injury: bool = False
 
@@ -43,6 +44,12 @@ class TeamGameSim:
     composite: dict[str, float] = field(default_factory=dict)
     pace: float = 1.0
     front: str = "4-3"
+    # ── M4: 전술·준비 (없으면 리그 평균 전술) ──
+    tactics: object = None             # gridiron.tactics.model.Tactics
+    familiarity: dict | None = None
+    prep: dict | None = None           # 이번 주 훈련 준비값
+    scout: dict | None = None          # 상대에 대한 사전 정보 (scouting.prior)
+    ai_controlled: bool = True         # False면 사용자 전술의 λ를 그대로 쓴다
 
     def __post_init__(self) -> None:
         self.stat["ptsQtrs"] = [0]

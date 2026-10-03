@@ -1,0 +1,36 @@
+# 콜별 능력치 가중치 — ENGINE_DESIGN §4.2, PRD F4-8a.
+# 콜이 대결에 쓰이는 능력치를 정한다. 같은 로스터라도 콜 비율(전술)에 따라 유닛 종합치가 달라진다 = 전술 궁합.
+# 합이 1이 아니어도 된다 (정규화해서 쓴다). 역할 평가(F2-6)도 이 표를 쓴다.
+
+run_block:            # OL·블로킹 TE. 존은 이동·민첩, 갭은 힘 (설계 §4.2보다 대비를 키움 — 실측 능력치에서 T3 궁합 차이 확보)
+  zone: {run_block: 0.40, agility: 0.35, speed: 0.20, strength: 0.05}
+  gap:  {run_block: 0.40, strength: 0.50, agility: 0.05, speed: 0.05}
+carry:                # 볼 캐리어
+  zone: {vision: 0.35, acceleration: 0.25, speed: 0.20, elusiveness: 0.20}
+  gap:  {break_tackle: 0.35, strength: 0.25, vision: 0.25, ball_security: 0.15}
+lead_block:           # FB·두 번째 TE (갭 런에서 리드 블록)
+  zone: {run_block: 0.6, agility: 0.2, strength: 0.2}
+  gap:  {lead_block: 0.45, run_block: 0.25, strength: 0.30}
+run_def:              # DL·LB
+  zone: {run_stop: 0.45, pursuit: 0.25, block_shedding: 0.20, speed: 0.10}
+  gap:  {run_stop: 0.45, block_shedding: 0.35, strength: 0.20}
+coverage:
+  man:  {man_coverage: 0.45, press: 0.20, speed: 0.20, agility: 0.15}
+  zone: {zone_coverage: 0.45, football_iq: 0.25, ball_skills: 0.20, acceleration: 0.10}
+pass_rush:            # 프론트별 (3-4 OLB는 엔진에서 DL 그룹)
+  "4-3": {power_rush: 0.35, finesse_rush: 0.35, strength: 0.20, acceleration: 0.10}
+  "3-4": {finesse_rush: 0.35, speed: 0.25, power_rush: 0.25, acceleration: 0.15}
+blitz_rush:           # 블리츠에 가담한 LB·S
+  any: {finesse_rush: 0.4, speed: 0.3, acceleration: 0.3}
+pass_block:
+  any: {pass_block: 0.7, strength: 0.15, agility: 0.15}
+qb:                   # 던진 깊이별
+  screen: {short_accuracy: 0.7, decision: 0.3}
+  quick:  {short_accuracy: 0.45, decision: 0.35, pocket_presence: 0.20}
+  inter:  {medium_accuracy: 0.6, decision: 0.25, pocket_presence: 0.15}
+  deep:   {deep_accuracy: 0.45, throw_power: 0.35, pocket_presence: 0.20}
+receiver:
+  screen: {catching: 0.4, elusiveness: 0.3, speed: 0.3}
+  quick:  {route_running: 0.4, catching: 0.35, release: 0.25}
+  inter:  {route_running: 0.4, catching: 0.3, release: 0.15, contested_catch: 0.15}
+  deep:   {speed: 0.3, route_running: 0.25, contested_catch: 0.25, catching: 0.2}

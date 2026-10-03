@@ -64,7 +64,7 @@ print("\n완성률 × 깊이 × 압박 (스로어웨이 제외, 시뮬 / 실측)
 for depth in ("screen", "quick", "inter", "deep"):
     for pr in (0, 1):
         xs = [d for d in thrown if d[3] == depth and d[1] == pr and not d[5]]
-        real = lookup("pass_rates", depth, pr, "*", "*", "*")["cmp"]
+        real = lookup("pass_rates", depth, "*", pr, "*", "*", "*")["cmp"]
         if xs:
             print(f"  {depth:6} 압박{pr}: {mean(x[4] for x in xs) * 100:.1f}% / {real * 100:.1f}%  (n={len(xs)})")
 
