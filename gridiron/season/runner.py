@@ -106,6 +106,9 @@ def finish_week(path: Path, league: League, week: int, user_team: str | None = N
         notes.append(f"{league.season} 시즌 종료 — 우승 {league.teams[standings.champion(league)].name}")
         if league.owner is not None and league.owner.grade is None:
             owner.season_review(league.owner, league, path)
+    if user_team:
+        from .knowledge import weekly_update
+        weekly_update(league, user_team, week)
     st = league.owner
     if st is not None and user_team:
         if user_team in played and league.phase == "regular":

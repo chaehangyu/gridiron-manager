@@ -17,7 +17,8 @@ Football Manager 스타일의 NFL 미식축구 매니지먼트 시뮬레이션 �
 | M2 기준 분포 + 판단 모델 | ✅ | 실측 결과 모델(압박→깊이→결과, 박스별 런, 특수팀), EP·WP·xpass 재학습, nfl4th 방식 4th down·2점 판단 |
 | M3 능력치 + 보정 | ✅ | 실측 지표 50여 개 + 명단 기반 릿지 회귀 → 경험적 베이즈 수축 → 1–20 능력치, F2-5d 분포 자동 보정, β 적합, 2025 재현 테스트 통과 |
 | M4 전술·학습·훈련 | ✅ | 3계층 전술(철학·상황별·주간 게임플랜)·프리셋, 콜별 능력치 가중치(궁합), 전술 숙련도, 주간 훈련, 경기 중 상대 성향 학습(믿음·대응·읽힘), AI 팀 실측 성향 전술, 스카우팅 리포트. 검증 T1–T9 중 7개 통과, T5·T6 미달 (ENGINE_DESIGN §15) |
-| M5 시즌 + 부상 + 운영 | 다음 | 타이브레이커·플레이오프, 부상 관리, 대체 영입, 구단주 목표, 스카우팅 파악도 |
+| M5 시즌 + 부상 + 운영 | ✅ | 공식 타이브레이커(2021–2025 실제 대진 재현)·플레이오프, 실측 부상 모델(2.2건/팀경기)·IR·주간 리포트, 53/PS/48 로스터·FA 대체 영입, 구단주 기대치(엔진 200시즌 투영)·신뢰도·평가, 스카우팅 파악도·능력치 범위, 역할 평가 |
+| M6 웹 UI | 다음 | S1–S16 화면 (HTMX) |
 
 경기 결과는 **실측 결과 모델**(nflverse 2022–2025 약 16만 플레이 기반)로 계산합니다. 1,000경기 리그 평균이 PRD 보정 목표를 모두 만족합니다 (ENGINE_DESIGN §13).
 선수 능력치는 **직전 3시즌 실제 기록으로 산출**합니다 (`data/real/2026/ratings.csv`). 같은 방식으로 2022–2024 기록만 써서 2025 시즌을 재현하면
@@ -44,7 +45,14 @@ gridiron gameplan --save saves/career.sqlite                       # 다음 상�
 gridiron train --save saves/career.sqlite --main familiarity:cov_man --sub opponent --intensity hard
 gridiron sim-game --save saves/career.sqlite --pbp                 # 우리 팀 이번 주 경기 + 텍스트 중계 + 전술 리포트
 gridiron sim-week --save saves/career.sqlite                       # 이번 주 나머지 경기
-gridiron standings --save saves/career.sqlite
+gridiron sim-season --save saves/career.sqlite --quiet             # 남은 시즌 한 번에 (플레이오프·슈퍼볼까지)
+gridiron standings --save saves/career.sqlite                      # 공식 타이브레이커 순위·시드·플레이오프
+gridiron injuries --save saves/career.sqlite                       # 부상 리포트 (--sit/--play, --ir/--activate)
+gridiron roster --save saves/career.sqlite                         # 53인·연습 스쿼드·IR·경기 당일 48인 (--release, --promote, --elevate …)
+gridiron fa --save saves/career.sqlite --pos WR                    # FA 풀 (--sign <id> [--ps])
+gridiron owner --save saves/career.sqlite                          # 구단주 목표·신뢰도·인박스 (--firing off)
+gridiron player "Josh Allen" --save saves/career.sqlite            # 선수 프로필 (다른 팀 선수는 파악도 범위)
+gridiron scout --save saves/career.sqlite --assign next_opponent free_agents pos:WR
 gridiron quick --home KC --away BUF --pbp                          # 저장 없이 한 경기
 ```
 
@@ -58,6 +66,9 @@ python tools/calibrate_centers.py 400 real:2026    # 평균 매치업 중심 보
 python tools/reproduce_season.py --season 2025     # 시즌 재현 테스트 + β 배율 적합 (M3)
 python tools/validate_tactics.py all               # 엔진 검증 T1–T9 (M4, 실제 리그, 약 15분)
 python tools/calibrate_situations.py 4 1600        # 상황별 결과 보정값 적합 (M4)
+python tools/check_injuries.py 2                   # 부상 지표 vs 실측 (M5)
+python tools/check_owner.py 3                      # 구단주 기대치 vs 엔진 시즌 결과 (M5)
+python tools/research/injury_rates.py              # 실측 부상률 → data/baseline/injuries.json
 python -m gridiron.baseline.tactics_data --season 2025   # 상성표·팀 성향 재생성
 python tools/research/measure_effects.py          # 실측 효과 크기 (ENGINE_DESIGN §2)
 
@@ -77,7 +88,7 @@ gridiron/
   domain/      포지션, 능력치, 선수·팀·리그 모델, 뎁스차트
   ratings/     포지션 평가(PR), 임시 능력치 생성기, derive(실측 능력치 파이프라인: 지표·RAPM·수축·신체·의료)
   tactics/     전술 3계층·프리셋, 숙련도, 주간 훈련, 스카우팅 기록, 전술 궁합
-  season/      주간 진행 (훈련 적용 → 경기 → 숙련도·스카우팅·컨디션 갱신)
+  season/      주간 진행, 시즌 진행(runner), 순위·타이브레이커·플레이오프, 부상, 로스터, 구단주, 스카우팅 파악도
   data/        nflverse 수집·가공, 실제 리그 로더, 샘플 리그
   db/          세이브 스키마와 저장·불러오기
   baseline/    실측 기준 분포 생성(build)·모델 학습(train_models)·런타임 조회(tables)

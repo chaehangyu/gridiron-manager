@@ -190,7 +190,129 @@ def cmd_owner(args) -> None:
         print(f"  [{m['week']}주] {m['text']}")
 
 
+def _season_stats(path: Path, pid: str, season: int) -> dict:
+    from sqlmodel import Session, select
+
+    from .db import schema as S
+    from .db.store import engine_for
+    tot: dict = {}
+    with Session(engine_for(path)) as s:
+        q = select(S.PlayerGameStatsRow, S.GameRow).where(S.PlayerGameStatsRow.player_id == pid) \
+            .where(S.GameRow.id == S.PlayerGameStatsRow.game_id).where(S.GameRow.season == season)
+        for r, _ in s.exec(q):
+            for k, v in r.stats.items():
+                if isinstance(v, (int, float)):
+                    tot[k] = tot.get(k, 0) + v
+    return tot
+
+
+def _injury_history(path: Path, pid: str) -> list:
+    from sqlmodel import Session, select
+
+    from .db import schema as S
+    from .db.store import engine_for
+    with Session(engine_for(path)) as s:
+        return list(s.exec(select(S.InjuryRow).where(S.InjuryRow.player_id == pid).order_by(S.InjuryRow.id)))
+
+
+def cmd_player(args) -> None:
+    """선수 프로필 (S4): 능력치(다른 팀 선수는 파악도 범위), 포지션별 PR, 역할 평가, 숨김 능력치 코멘트, 부상 이력, 기록."""
+    from .db.store import load_league
+    from .domain.attributes import ATTRIBUTES, HIDDEN_KEYS, grade_label
+    from .domain.positions import Position
+    from .ratings.position_rating import position_rating
+    from .ratings.roles import role_ratings
+    from .season import knowledge as KN
+    path = Path(args.save)
+    league, user_team = load_league(path)
+    cands = [p for p in league.players.values() if p.id == args.name or args.name.lower() in p.name.lower()]
+    if not cands:
+        sys.exit(f"선수 '{args.name}'를 찾을 수 없습니다")
+    if len(cands) > 1 and not any(p.id == args.name for p in cands):
+        for p in cands[:15]:
+            print(f"  {p.id:<14} {p.position.value:<4} {p.name} ({p.team or 'FA'})")
+        sys.exit("여러 명입니다. id로 지정하세요.")
+    p = next((c for c in cands if c.id == args.name), cands[0])
+    own = p.team == user_team
+    k = KN.knowledge(league, p, user_team)
+    lo, hi = KN.pr_range(league, p, user_team)
+    age = p.age_on(league.season_start())
+    pr_txt = KN.fmt_range(lo, hi)
+    print(f"\n{p.name} — {p.position.value}, {p.team or 'FA'} ({p.roster_status.value}), {age:.1f}세, "
+          f"{p.height_in or '?'}in {p.weight_lb or '?'}lb, 경력 {p.years_exp}년")
+    print(f"  PR {pr_txt} {KN.star_text(lo, hi)}   파악도 {k:.0f}/100   컨디션 {p.condition:.0f}")
+    groups: dict[str, list[str]] = {}
+    for d in ATTRIBUTES.values():
+        if d.key in HIDDEN_KEYS:
+            continue
+        r = KN.attr_range(league, p, d.key, user_team)
+        val = f"{p.attributes[d.key]:.0f}" if r and r[0] == r[1] else f"{r[0]:.0f}–{r[1]:.0f}"
+        groups.setdefault(d.group, []).append(f"{d.label_ko} {val}")
+    for g, cells in groups.items():
+        print(f"  [{g}] " + ", ".join(cells))
+    if own:
+        print("  숨김: " + ", ".join(KN.hidden_comments(p, league.week - 1 if league.week > 1 else 0)))
+    else:
+        print("  숨김: 비공개")
+    special = (Position.K, Position.P, Position.LS)
+    top = sorted(((pos, position_rating(p, pos)) for pos in Position if pos == p.position or pos not in special),
+                 key=lambda x: -x[1])[:3]
+    print("  포지션별 PR: " + ", ".join(f"{pos.value} {KN.fmt_range(*KN.pr_range(league, p, user_team, pos))}"
+                                     for pos, _ in top))
+    rr = role_ratings(p)
+    if rr:
+        best = max(rr, key=lambda key: rr[key][1])
+        cells = [f"{n} {KN.fmt_range(*KN.value_range(league, p, user_team, v, 'role:' + key))}"
+                 + (" ◀" if key == best and own else "") for key, (n, v) in rr.items()]
+        print("  역할: " + ", ".join(cells) + (f"  → {grade_label(rr[best][1])}" if own else ""))
+    hist = _injury_history(path, p.id)
+    if hist or p.injury:
+        print("  부상 이력: " + "; ".join(f"{h.season} {h.week}주 {h.type} ({h.missed}경기 결장)" for h in hist))
+    st = _season_stats(path, p.id, league.season)
+    if st:
+        keys = [("gp", "경기"), ("snaps", "스냅"), ("pssCmp", "완성"), ("pss", "시도"), ("pssYds", "패싱야드"),
+                ("pssTD", "패싱TD"), ("pssInt", "INT"), ("rus", "러싱"), ("rusYds", "러싱야드"), ("rec", "리셉션"),
+                ("recYds", "리시빙야드"), ("defTck", "태클"), ("defSk", "색"), ("defInt", "INT"), ("defPssDef", "패스방어")]
+        print("  시즌 기록: " + ", ".join(f"{lab} {st[k]:.0f}" for k, lab in keys if st.get(k)))
+
+
+def cmd_scout(args) -> None:
+    """스카우트 배정 (F13-3)과 파악도 현황."""
+    from .db.store import load_league, save_team_state
+    from .season import knowledge as KN
+    from .season.roster import GROUPS
+    path = Path(args.save)
+    league, user_team = load_league(path)
+    if args.assign:
+        for tgt in args.assign:
+            if tgt not in KN.TARGETS and not (tgt.startswith("pos:") and tgt[4:] in GROUPS):
+                sys.exit(f"배정 대상: next_opponent, free_agents, pos:<{'|'.join(GROUPS)}>")
+        if len(args.assign) != KN.SCOUTS:
+            sys.exit(f"스카우트는 {KN.SCOUTS}명입니다")
+        league.scout_assignments = list(args.assign)
+        save_team_state(path, league)
+    asg = league.scout_assignments or KN.DEFAULT_ASSIGN
+    nxt = KN.next_opponent(league, user_team, league.week)
+    print(f"스카우트 배정: " + ", ".join(asg) + (f"   (다음 상대 {nxt})" if nxt else ""))
+    if nxt:
+        ks = [KN.knowledge(league, p, user_team) for p in league.roster(nxt)]
+        print(f"  {nxt} 선수 평균 파악도 {sum(ks) / max(1, len(ks)):.0f}")
+    fa = league.free_agents()
+    ks = [KN.knowledge(league, p, user_team) for p in fa]
+    print(f"  FA 평균 파악도 {sum(ks) / max(1, len(ks)):.0f} ({len(fa)}명)")
+
+
 def add_parsers(sub) -> None:
+    p = sub.add_parser("player", help="선수 프로필 (능력치·PR·역할·부상 이력·기록)")
+    p.add_argument("name")
+    p.add_argument("--save", default="saves/career.sqlite")
+    p.set_defaults(func=cmd_player)
+
+    p = sub.add_parser("scout", help="스카우트 배정과 파악도 (F13)")
+    p.add_argument("--save", default="saves/career.sqlite")
+    p.add_argument("--assign", nargs="+", help="3명 배정 (예: next_opponent free_agents pos:WR)")
+    p.set_defaults(func=cmd_scout)
+
     p = sub.add_parser("owner", help="구단주 목표·신뢰도·인박스 (F12)")
     p.add_argument("--save", default="saves/career.sqlite")
     p.add_argument("--firing", choices=["on", "off"], help="해고 켜기/끄기 (끄면 샌드박스)")

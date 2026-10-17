@@ -102,6 +102,7 @@ def save_team_state(path: Path, league: League) -> None:
                                          attributes={k: round(v, 3) for k, v in p.attributes.items()},
                                          source=p.ratings_source))
         _save_injuries(s, league)
+        _save_knowledge(s, league)
         s.commit()
 
 
@@ -258,6 +259,7 @@ def load_league(path: Path) -> tuple[League, str | None]:
                 for t in league.teams.values():
                     t.familiarity = familiarity.initial(t.front.value, None, None)
         load_owner(path, league)
+        _load_knowledge(s, league, meta.user_team)
         return league, meta.user_team
 
 
@@ -395,3 +397,31 @@ def load_owner(path: Path, league: League) -> None:
             d = dict(row.payload)
             d["history"] = [tuple(h) for h in d.get("history", [])]
             league.owner = OwnerState.from_dict(d)
+
+
+def _save_knowledge(s: Session, league: League) -> None:
+    """사용자 팀 파악도·스카우트 배정 (F13)."""
+    meta = s.exec(select(S.LeagueRow)).first()
+    team = meta.user_team if meta else None
+    if not team:
+        return
+    s.exec(delete(S.ScoutKnowledgeRow).where(S.ScoutKnowledgeRow.observer_team == team))
+    for pid, v in league.knowledge.items():
+        s.add(S.ScoutKnowledgeRow(observer_team=team, player_id=pid, value=round(v, 1), error_seed=0))
+    s.exec(delete(S.ScoutAssignmentRow).where((S.ScoutAssignmentRow.team == team)
+                                              & (S.ScoutAssignmentRow.season == league.season)))
+    for i, tgt in enumerate(league.scout_assignments):
+        kind, _, val = tgt.partition(":")
+        s.add(S.ScoutAssignmentRow(team=team, season=league.season, week=0, scout_no=i, target_type=kind,
+                                   target=val or None))
+
+
+def _load_knowledge(s: Session, league: League, team: str | None) -> None:
+    if not team:
+        return
+    for r in s.exec(select(S.ScoutKnowledgeRow).where(S.ScoutKnowledgeRow.observer_team == team)):
+        league.knowledge[r.player_id] = r.value
+    rows = s.exec(select(S.ScoutAssignmentRow).where((S.ScoutAssignmentRow.team == team)
+                                                     & (S.ScoutAssignmentRow.season == league.season))
+                  .order_by(S.ScoutAssignmentRow.scout_no))
+    league.scout_assignments = [r.target_type + (f":{r.target}" if r.target else "") for r in rows]

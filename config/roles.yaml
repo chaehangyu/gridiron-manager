@@ -1,0 +1,44 @@
+# 역할별 능력치 가중치 (PRD F2-6a). 합이 1이 아니어도 된다 (정규화). 역할 평가는 PR과 같은 1–20 척도.
+QB:
+  pocket_passer: {name: 포켓 패서, w: {short_accuracy: 18, medium_accuracy: 18, pocket_presence: 18, decision: 16, deep_accuracy: 10, composure: 10, football_iq: 10}}
+  field_general: {name: 필드 제너럴, w: {decision: 25, football_iq: 25, short_accuracy: 15, medium_accuracy: 15, composure: 10, leadership: 10}}
+  strong_arm: {name: 스트롱 암, w: {throw_power: 30, deep_accuracy: 30, medium_accuracy: 15, pocket_presence: 10, composure: 15}}
+  dual_threat: {name: 듀얼 스렛, w: {speed: 18, acceleration: 12, elusiveness: 12, throw_on_run: 20, short_accuracy: 13, medium_accuracy: 10, decision: 15}}
+RB:
+  one_cut: {name: 원컷 러너, w: {vision: 30, acceleration: 25, speed: 20, ball_security: 15, break_tackle: 10}}
+  elusive: {name: 회피형, w: {elusiveness: 30, agility: 25, acceleration: 20, vision: 15, speed: 10}}
+  power: {name: 파워 백, w: {break_tackle: 30, strength: 25, ball_security: 20, vision: 15, pass_block: 10}}
+  receiving: {name: 리시빙 백, w: {catching: 30, route_running: 25, elusiveness: 15, speed: 15, pass_block: 15}}
+WR:
+  x: {name: X (아웃사이드), w: {release: 22, contested_catch: 22, route_running: 18, catching: 18, speed: 12, strength: 8}}
+  z: {name: Z (플랭커), w: {route_running: 25, speed: 20, catching: 20, release: 15, acceleration: 10, elusiveness: 10}}
+  slot: {name: 슬롯, w: {route_running: 25, agility: 20, catching: 20, acceleration: 15, elusiveness: 10, football_iq: 10}}
+  deep: {name: 딥 스렛, w: {speed: 35, acceleration: 15, catching: 15, release: 15, contested_catch: 10, route_running: 10}}
+TE:
+  y: {name: Y (인라인 블로커), w: {run_block: 35, pass_block: 25, strength: 20, catching: 10, route_running: 10}}
+  f: {name: F (무브·리시빙), w: {route_running: 25, catching: 25, speed: 20, release: 15, contested_catch: 15}}
+  hybrid: {name: 하이브리드, w: {run_block: 20, catching: 20, route_running: 20, pass_block: 15, strength: 10, speed: 15}}
+OL:
+  zone: {name: 존 블로커, w: {run_block: 40, agility: 35, speed: 20, strength: 5}}
+  gap: {name: 갭/파워 블로커, w: {run_block: 40, strength: 50, agility: 5, speed: 5}}
+  protector: {name: 패스 프로텍터, w: {pass_block: 55, agility: 15, strength: 15, football_iq: 15}}
+EDGE:
+  hand_down: {name: 4-3 DE, w: {power_rush: 25, finesse_rush: 20, block_shedding: 20, strength: 15, run_stop: 20}}
+  stand_up: {name: 3-4 OLB, w: {finesse_rush: 30, acceleration: 20, speed: 15, zone_coverage: 15, pursuit: 20}}
+  run_stopper: {name: 런 스토퍼, w: {run_stop: 35, block_shedding: 30, strength: 20, tackling: 15}}
+DT:
+  penetrator: {name: 1-gap 침투형, w: {acceleration: 25, finesse_rush: 25, power_rush: 20, block_shedding: 15, pursuit: 15}}
+  nose: {name: 2-gap 노즈, w: {strength: 35, run_stop: 30, block_shedding: 25, tackling: 10}}
+  rusher: {name: 패스 러셔, w: {power_rush: 35, finesse_rush: 30, acceleration: 20, strength: 15}}
+LB:
+  mike: {name: 마이크, w: {run_stop: 25, tackling: 25, football_iq: 25, leadership: 10, block_shedding: 15}}
+  coverage: {name: 커버리지 LB, w: {zone_coverage: 30, man_coverage: 20, speed: 20, pursuit: 15, football_iq: 15}}
+  blitzer: {name: 블리처, w: {finesse_rush: 25, power_rush: 20, acceleration: 25, pursuit: 15, tackling: 15}}
+CB:
+  press_man: {name: 프레스 맨, w: {press: 30, man_coverage: 35, speed: 20, strength: 15}}
+  zone: {name: 존 CB, w: {zone_coverage: 35, ball_skills: 25, football_iq: 20, speed: 10, tackling: 10}}
+  slot: {name: 슬롯 CB, w: {man_coverage: 25, agility: 25, acceleration: 20, zone_coverage: 15, tackling: 15}}
+S:
+  free: {name: 싱글하이 FS, w: {zone_coverage: 30, speed: 25, ball_skills: 20, football_iq: 25}}
+  box: {name: 박스 SS, w: {run_stop: 25, tackling: 30, strength: 15, pursuit: 15, zone_coverage: 15}}
+  hybrid: {name: 하이브리드, w: {man_coverage: 30, zone_coverage: 20, tackling: 20, speed: 15, agility: 15}}
