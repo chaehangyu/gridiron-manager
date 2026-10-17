@@ -79,6 +79,7 @@ class Player:
     rust_games: int = 0            # 남은 경기 감각 페널티 경기 수
     ir_week: int | None = None     # IR 등재 주
     concussions: int = 0           # 이번 시즌 뇌진탕 횟수
+    elevations: int = 0            # 이번 시즌 연습 스쿼드 임시 승격 횟수 (F3-8b)
 
     def __post_init__(self) -> None:
         missing = [k for k in ATTR_KEYS if k not in self.attributes]
@@ -124,6 +125,10 @@ class Team:
     usage: dict[str, float] = field(default_factory=dict)  # 최근 경기 영역 사용량 (숙련도 감소 판단)
     scouting: dict = field(default_factory=dict)          # 이번 시즌 콜 성향 누적 (상대가 본다)
     last_tendency: dict | None = None                     # 지난 시즌 실측 성향
+    # ── 로스터 운영 (F3, M5c) ──
+    elevated: list[str] = field(default_factory=list)     # 이번 주 연습 스쿼드 임시 승격
+    inactives: list[str] = field(default_factory=list)    # 사용자 지정 비활성 (경기 당일 48인에서 제외)
+    auto_roster: bool = True                              # 대체 영입·임시 승격 자동 (스태프 권고)
 
     def tactics_for_week(self, week: int) -> "Tactics":
         return self.tactics.merged(self.gameplan if self.gameplan_week == week else None)

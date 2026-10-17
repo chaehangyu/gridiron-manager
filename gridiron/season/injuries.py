@@ -87,8 +87,11 @@ def after_week(league: League, week: int, played: set[str]) -> None:
         if p.rust_games > 0 and p.roster_status == RosterStatus.ACTIVE and not p.injured:
             p.rust_games -= 1                          # 복귀 경기를 치렀다
         inj = p.injury
-        if inj is None or inj.week == week or inj.weeks_remaining >= SEASON_OUT:
-            continue                                   # 이번 주에 막 다쳤거나 시즌 아웃
+        if inj is None or inj.week == week:
+            continue                                   # 이번 주에 막 다쳤다
+        if inj.weeks_remaining >= SEASON_OUT:
+            inj.missed += 1
+            continue
         if inj.weeks_remaining > 0:
             inj.weeks_remaining -= 1
             inj.missed += 1
@@ -124,6 +127,10 @@ def auto_ir(league: League, week: int, teams: set[str]) -> list[tuple[str, Playe
 def place_ir(league: League, p: Player, week: int) -> None:
     p.roster_status = RosterStatus.IR
     p.ir_week = week
+    if p.injury:
+        p.injury.status, p.injury.practice = "out", "dnp"
+    if p.team and p.id in league.teams[p.team].elevated:
+        league.teams[p.team].elevated.remove(p.id)
 
 
 def can_activate(league: League, p: Player, week: int) -> tuple[bool, str]:
@@ -156,7 +163,8 @@ def report_rows(league: League, team: str) -> list[dict]:
         inj = p.injury
         rng = "시즌 아웃" if inj.weeks_out_min >= SEASON_OUT else f"{inj.weeks_out_min}–{inj.weeks_out_max}경기"
         rows.append({"id": p.id, "name": p.name, "pos": p.position.value, "injury": inj.type, "severity": inj.severity,
-                     "range": rng, "status": STATUS_KO[inj.status], "practice": PRACTICE_KO[inj.practice],
+                     "range": rng, "status": STATUS_KO[inj.status],
+                     "practice": "—" if p.roster_status == RosterStatus.IR else PRACTICE_KO[inj.practice],
                      "ir": p.roster_status == RosterStatus.IR, "missed": inj.missed, "sit": inj.sit})
     rows.sort(key=lambda r: (r["ir"], r["status"]))
     return rows

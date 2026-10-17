@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Callable
 
 from ..domain.models import League, ScheduledGame
-from . import injuries, standings
+from . import injuries, roster, standings
 from .weekly import after_game, prepare_week
 
 ROUND_LABEL = {"REG": "정규시즌", "WC": "와일드카드", "DIV": "디비저널", "CON": "컨퍼런스 챔피언십", "SB": "슈퍼볼",
@@ -25,7 +25,7 @@ def play_game(path: Path, league: League, game: ScheduledGame, user_team: str | 
               seed: int | None = None):
     from ..db.store import record_game, save_team_state
     from ..engine.api import simulate
-    prepare_week(league, game.week)
+    start_week(path, league, game.week)
     out = simulate(league, game, seed=seed if seed is not None else seed_for(game), play_by_play=pbp,
                    user_team=user_team)
     record_game(path, game, {"overtimes": out.overtimes}, out.seed, out.box, tactics=out.tactics)
@@ -33,6 +33,20 @@ def play_game(path: Path, league: League, game: ScheduledGame, user_team: str | 
     injuries.apply_game(league, game, out.injuries)
     save_team_state(path, league)
     return out
+
+
+def start_week(path: Path, league: League, week: int) -> list[roster.Move]:
+    """주 시작 (한 번만): 훈련·부상 리포트, 자동 관리 팀의 경기 당일 연습 스쿼드 임시 승격."""
+    from ..db.store import record_transactions
+    if league.prepared_week >= week:
+        return []
+    prepare_week(league, week)
+    moves = []
+    for abbr, t in league.teams.items():
+        if t.auto_roster and any(abbr in (g.home, g.away) for g in league.games_in_week(week)):
+            moves += roster.gameday_elevations(league, abbr)
+    record_transactions(path, league.season, week, moves)
+    return moves
 
 
 def finish_week(path: Path, league: League, week: int, user_team: str | None = None) -> list[str]:
@@ -44,9 +58,20 @@ def finish_week(path: Path, league: League, week: int, user_team: str | None = N
     notes: list[str] = []
     played = {t for g in games for t in (g.home, g.away)}
     injuries.after_week(league, week, played)
-    for team, p, move in injuries.auto_ir(league, week, set(league.teams)):
+    auto = {a for a, t in league.teams.items() if t.auto_roster}
+    for team, p, move in injuries.auto_ir(league, week, auto):
         if team == user_team:
             notes.append(f"{p.name}({p.position.value}) " + ("IR 등재" if move == "ir" else "IR 복귀"))
+    roster.clear_elevations(league, played)
+    moves = roster.weekly_moves(league, sorted(auto))
+    from ..db.store import record_transactions
+    record_transactions(path, league.season, week, [m for ms in moves.values() for m in ms])
+    if user_team:
+        notes += [m.text() for m in moves.get(user_team, [])]
+        if not league.teams[user_team].auto_roster:
+            n = len(roster.active(league, user_team))
+            if n < roster.limits()["active_max"]:
+                notes.append(f"53인 로스터에 {roster.limits()['active_max'] - n}자리가 비었습니다 (gridiron fa)")
     new = standings.next_round(league)
     if new:
         league.schedule.extend(new)

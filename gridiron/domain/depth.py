@@ -101,7 +101,9 @@ def engine_depth(team: Team, players: dict[str, Player]) -> dict[str, list[str]]
                 if pid not in depth[eng]:
                     depth[eng].append(pid)
 
-    roster = [p for p in players.values() if p.team == team.abbr and p.roster_status == RosterStatus.ACTIVE]
+    # players는 경기 당일 명단(53인 + 임시 승격 연습 스쿼드)
+    roster = [p for p in players.values() if p.team == team.abbr
+              and p.roster_status in (RosterStatus.ACTIVE, RosterStatus.PRACTICE_SQUAD)]
     for p in sorted(roster, key=position_rating, reverse=True):
         eng = POSITION_TO_ENGINE[p.position]
         if p.position == Position.LS:

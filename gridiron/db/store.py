@@ -34,11 +34,7 @@ def save_league(league: League, path: Path, user_team: str | None = None) -> Non
                 for i, pid in enumerate(ids):
                     s.add(S.DepthChartRow(team=t.abbr, slot=slot, order=i, player_id=pid))
         for p in league.players.values():
-            s.add(S.PlayerRow(id=p.id, name=p.name, position=p.position.value, team=p.team,
-                              roster_status=p.roster_status.value, birth_date=p.birth_date, height_in=p.height_in,
-                              weight_lb=p.weight_lb, college=p.college, jersey=p.jersey, years_exp=p.years_exp,
-                              draft_year=p.draft_year, draft_round=p.draft_round, draft_pick=p.draft_pick,
-                              draft_team=p.draft_team, condition=p.condition))
+            s.add(_player_row(p))
             s.add(S.PlayerRatingsRow(player_id=p.id, season=league.season, week=0,
                                      attributes={k: round(v, 3) for k, v in p.attributes.items()},
                                      source=p.ratings_source))
@@ -52,6 +48,14 @@ def save_league(league: League, path: Path, user_team: str | None = None) -> Non
 
 
 LEAGUE_STATE = "__league__"
+
+
+def _player_row(p: Player) -> S.PlayerRow:
+    return S.PlayerRow(id=p.id, name=p.name, position=p.position.value, team=p.team,
+                       roster_status=p.roster_status.value, birth_date=p.birth_date, height_in=p.height_in,
+                       weight_lb=p.weight_lb, college=p.college, jersey=p.jersey, years_exp=p.years_exp,
+                       draft_year=p.draft_year, draft_round=p.draft_round, draft_pick=p.draft_pick,
+                       draft_team=p.draft_team, condition=p.condition)
 
 
 def save_team_state(path: Path, league: League) -> None:
@@ -68,7 +72,9 @@ def save_team_state(path: Path, league: League) -> None:
                 s.add(S.TacticsRow(team=t.abbr, season=season, layer="gameplan", week=t.gameplan_week or 0,
                                    payload=t.gameplan))
             s.add(S.TacticsRow(team=t.abbr, season=season, layer="state", week=0,
-                               payload={"usage": t.usage, "prep": t.prep, "last_tendency": t.last_tendency}))
+                               payload={"usage": t.usage, "prep": t.prep, "last_tendency": t.last_tendency,
+                                        "elevated": t.elevated, "inactives": t.inactives,
+                                        "auto_roster": t.auto_roster}))
             for dim, v in t.familiarity.items():
                 s.add(S.FamiliarityRow(team=t.abbr, season=season, week=week, dimension=dim, value=v))
             tp = t.training
@@ -78,7 +84,9 @@ def save_team_state(path: Path, league: League) -> None:
                            payload={"prepared_week": league.prepared_week, "league_tendency": league.league_tendency,
                                     "ir_returns_used": league.ir_returns_used}))
         players = league.players
+        known = set()
         for row in s.exec(select(S.PlayerRow)):
+            known.add(row.id)
             p = players.get(row.id)
             if p is None:
                 continue
@@ -86,13 +94,20 @@ def save_team_state(path: Path, league: League) -> None:
                     or row.roster_status != p.roster_status.value):
                 row.condition, row.team, row.roster_status = p.condition, p.team, p.roster_status.value
                 s.add(row)
+        for p in players.values():
+            if p.id not in known:          # 시즌 중 생성된 대체 선수 (M5c)
+                s.add(_player_row(p))
+                s.add(S.PlayerRatingsRow(player_id=p.id, season=season, week=week,
+                                         attributes={k: round(v, 3) for k, v in p.attributes.items()},
+                                         source=p.ratings_source))
         _save_injuries(s, league)
         s.commit()
 
 
 def _player_state(p: Player) -> dict:
     return {k: v for k, v in (("reinjury_until", p.reinjury_until), ("rust_games", p.rust_games),
-                              ("ir_week", p.ir_week), ("concussions", p.concussions)) if v}
+                              ("ir_week", p.ir_week), ("concussions", p.concussions),
+                              ("elevations", p.elevations)) if v}
 
 
 def _save_injuries(s: Session, league: League) -> None:
@@ -172,6 +187,9 @@ def _load_team_state(s: Session, league: League) -> bool:
             t.usage = dict(r.payload.get("usage") or {})
             t.prep = dict(r.payload.get("prep") or {})
             t.last_tendency = r.payload.get("last_tendency")
+            t.elevated = list(r.payload.get("elevated") or [])
+            t.inactives = list(r.payload.get("inactives") or [])
+            t.auto_roster = r.payload.get("auto_roster", True)
     fam_rows = s.exec(select(S.FamiliarityRow).where((S.FamiliarityRow.season == league.season)
                                                      & (S.FamiliarityRow.player_id == None))  # noqa: E711
                       .order_by(S.FamiliarityRow.week))
@@ -317,3 +335,23 @@ def set_playoff_results(path: Path, season: int, results: dict[str, str]) -> Non
             ts.playoff_result = res
             s.add(ts)
         s.commit()
+
+
+def record_transactions(path: Path, season: int, week: int, moves) -> None:
+    """로스터 이동 기록 (roster.Move 목록)."""
+    if not moves:
+        return
+    eng = engine_for(path)
+    with Session(eng) as s:
+        for m in moves:
+            s.add(S.TransactionRow(season=season, week=week, team=m.team, player_id=m.player.id, type=m.kind))
+        s.commit()
+
+
+def transactions(path: Path, season: int, team: str | None = None) -> list[S.TransactionRow]:
+    eng = engine_for(path)
+    with Session(eng) as s:
+        q = select(S.TransactionRow).where(S.TransactionRow.season == season)
+        if team:
+            q = q.where(S.TransactionRow.team == team)
+        return list(s.exec(q.order_by(S.TransactionRow.id)))

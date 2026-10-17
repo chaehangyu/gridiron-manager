@@ -1,4 +1,11 @@
-"""시즌 운영 명령 (M5): 부상 관리.
+"""시즌 운영 명령 (M5): 부상 관리, 로스터 운영.
+
+    gridiron roster --save s.sqlite                    # 53인·연습 스쿼드·IR, 경기 당일 48인
+    gridiron roster --save s.sqlite --auto off         # 대체 영입·임시 승격 자동 관리 끄기
+    gridiron roster --save s.sqlite --release <id> | --promote <id> | --demote <id> | --elevate <id>
+    gridiron roster --save s.sqlite --inactive <id> | --activate-gameday <id>
+    gridiron fa --save s.sqlite --pos WR               # FA 풀 (PR 순)
+    gridiron fa --save s.sqlite --sign <id> [--ps]     # 최저 연봉 1년 계약
 
     gridiron injuries --save s.sqlite                  # 우리 팀 부상 리포트
     gridiron injuries --save s.sqlite --team BUF       # 상대 팀 공식 리포트 (리그 전체 공개)
@@ -63,7 +70,112 @@ def cmd_injuries(args) -> None:
         print(f"\nIR 복귀 지정 {used}/{INJ.rules()['return_designations']}회 사용")
 
 
+def cmd_roster(args) -> None:
+    from .db.store import load_league, record_transactions, save_team_state
+    from .ratings.position_rating import position_rating
+    from .season import roster as R
+    path = Path(args.save)
+    league, user_team = load_league(path)
+    team = args.team or user_team
+    t = league.teams[team]
+    acts = [(args.release, R.release), (args.promote, R.promote), (args.demote, R.demote), (args.elevate, R.elevate)]
+    if any(k for k, _ in acts) or args.auto or args.inactive or args.activate_gameday:
+        if team != user_team:
+            sys.exit("다른 팀 로스터는 바꿀 수 없습니다.")
+        moves = []
+        for key, fn in acts:
+            if not key:
+                continue
+            p = _find(league, team, key)
+            if fn is R.elevate:
+                ok, why = R.can_elevate(league, team, p)
+                if not ok:
+                    sys.exit(why)
+            if fn is R.promote and len(R.active(league, team)) >= R.limits()["active_max"]:
+                sys.exit("53인 가득 — 먼저 방출하세요")
+            moves.append(fn(league, team, p))
+        if args.inactive:
+            t.inactives.append(_find(league, team, args.inactive).id)
+        if args.activate_gameday:
+            pid = _find(league, team, args.activate_gameday).id
+            t.inactives = [i for i in t.inactives if i != pid]
+        if args.auto:
+            t.auto_roster = args.auto == "on"
+        for m in moves:
+            print(m.text())
+        record_transactions(path, league.season, league.week, moves)
+        save_team_state(path, league)
+    act = R.active(league, team)
+    game = {p.id for p in R.gameday_actives(league, team)}
+    lim = R.limits()
+    print(f"\n{t.name} 로스터 — 53인 {len(act)}/{lim['active_max']}, 연습 스쿼드 {len(R.practice_squad(league, team))}/"
+          f"{lim['practice_squad']}, 경기 당일 활성 {len(game)}/{lim['gameday_active']}, "
+          f"자동 관리 {'켜짐' if t.auto_roster else '꺼짐'}")
+    for g in R.GROUPS:
+        ps = sorted((p for p in act if R.GROUP_OF.get(p.position) == g), key=position_rating, reverse=True)
+        cells = []
+        for p in ps:
+            mark = "" if p.id in game else ("✚" if p.injured else "·")
+            cells.append(f"{p.name.split()[-1]}{mark} {position_rating(p):.1f}")
+        print(f"  {g:<4} " + ", ".join(cells))
+    ps = sorted(R.practice_squad(league, team), key=position_rating, reverse=True)
+    print("  연습 스쿼드: " + ", ".join(f"{p.name.split()[-1]}({p.position.value} {position_rating(p):.1f}"
+                                       f"{', 승격 ' + str(p.elevations) if p.elevations else ''})" for p in ps))
+    ir = [p for p in league.roster(team, (R.RosterStatus.IR,))]
+    print(f"  IR {len(ir)}명: " + ", ".join(f"{p.name.split()[-1]}({p.position.value})" for p in ir))
+    print("  (✚ 부상 결장, · 경기 당일 비활성)")
+
+
+def cmd_fa(args) -> None:
+    from .db.store import load_league, record_transactions, save_team_state
+    from .ratings.position_rating import position_rating
+    from .season import roster as R
+    path = Path(args.save)
+    league, user_team = load_league(path)
+    if args.sign:
+        cands = [p for p in league.free_agents() if p.id == args.sign or args.sign.lower() in p.name.lower()]
+        if len(cands) != 1:
+            sys.exit(f"FA '{args.sign}'를 하나로 특정할 수 없습니다 ({len(cands)}명)")
+        ok, why = R.can_sign(league, user_team, cands[0], args.ps)
+        if not ok:
+            sys.exit(why)
+        m = R.sign(league, user_team, cands[0], args.ps)
+        record_transactions(path, league.season, league.week, [m])
+        save_team_state(path, league)
+        print(m.text())
+        return
+    group = args.pos.upper() if args.pos else None
+    if group and group not in R.GROUPS:
+        sys.exit(f"포지션 그룹: {', '.join(R.GROUPS)}")
+    fa = R.free_agents(league, group)[: args.top]
+    print(f"FA 풀 {'(' + group + ')' if group else ''} — 상위 {len(fa)}명")
+    for p in fa:
+        age = p.age_on(league.season_start())
+        print(f"  {p.id:<14} {p.position.value:<4} {p.name:<24} PR {position_rating(p):>4.1f}  {age:>4.1f}세  "
+              f"경력 {p.years_exp}년")
+
+
 def add_parsers(sub) -> None:
+    p = sub.add_parser("roster", help="로스터·연습 스쿼드·경기 당일 명단 (F3)")
+    p.add_argument("--save", default="saves/career.sqlite")
+    p.add_argument("--team")
+    p.add_argument("--auto", choices=["on", "off"], help="대체 영입·임시 승격 자동 관리")
+    p.add_argument("--release")
+    p.add_argument("--promote", help="연습 스쿼드 → 53인")
+    p.add_argument("--demote", help="53인 → 연습 스쿼드")
+    p.add_argument("--elevate", help="이번 경기 연습 스쿼드 임시 승격")
+    p.add_argument("--inactive", help="경기 당일 비활성 지정")
+    p.add_argument("--activate-gameday", help="비활성 지정 취소")
+    p.set_defaults(func=cmd_roster)
+
+    p = sub.add_parser("fa", help="FA 풀·대체 영입 (F3-8)")
+    p.add_argument("--save", default="saves/career.sqlite")
+    p.add_argument("--pos", help="포지션 그룹 (QB, RB, WR, TE, OL, EDGE, DT, LB, CB, S, K, P, LS)")
+    p.add_argument("--top", type=int, default=20)
+    p.add_argument("--sign")
+    p.add_argument("--ps", action="store_true", help="연습 스쿼드로 영입")
+    p.set_defaults(func=cmd_fa)
+
     p = sub.add_parser("injuries", help="부상 리포트·출전 결정·IR 관리 (F10)")
     p.add_argument("--save", default="saves/career.sqlite")
     p.add_argument("--team")

@@ -153,8 +153,8 @@ def build_team(league: League, abbr: str, team_num: int, on_day: date, week: int
     from ..domain.positions import POSITION_TO_ENGINE
 
     team: Team = league.teams[abbr]
-    roster = [p for p in league.players.values()
-              if p.team == abbr and p.roster_status == RosterStatus.ACTIVE and not p.injured]
+    from ..season.roster import gameday_actives
+    roster = gameday_actives(league, abbr)       # 경기 당일 활성 48인 (부상·비활성 제외, 임시 승격 포함)
     cache: dict[str, PlayerGameSim] = {p.id: to_game_player(p, POSITION_TO_ENGINE[p.position], on_day, week)
                                        for p in roster}
     depth_ids = engine_depth(team, {p.id: p for p in roster})
