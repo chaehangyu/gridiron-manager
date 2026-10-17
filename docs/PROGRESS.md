@@ -6,7 +6,7 @@
 | 단계 | 상태 | 비고 |
 |------|------|------|
 | M0–M4 | ✅ (main) | 데이터·엔진·능력치·전술. M4 검증 T5·T6 미달은 M7 보정 과제 |
-| M5 시즌 + 부상 + 운영 | ✅ (작업 브랜치) | 하위 단계는 아래 |
+| M5 시즌 + 부상 + 운영 | ✅ (main, ead9b31) | 하위 단계는 아래 |
 | M6 웹 UI (HTMX) | 다음 | S1–S16 |
 | M7 폴리싱 | 대기 | 리포트·어워드·엔진 보정(T1·T5·T6) |
 
@@ -23,9 +23,25 @@
 - F3-4 로테이션 설정, F3-5 퍼스넬 패키지별 배치, F11-1c 그룹별 강도, F11-1d 부상 선수 훈련 효과, F11-3d·선수 단위 숙련도, F8-2 코치 아키타입, F13-8 전술 변화 감지, F2-6b 실제 사용 패턴 기반 역할.
 - 엔진: 경기 득실차 잔차 SD 10.8 (실제 ≈13.5) — M7 보정 때 T1·T5·T6과 함께 본다.
 
-## M6 시작 메모
-- UI는 CLI 명령이 하는 일을 그대로 화면으로: `cli.py`, `cli_tactics.py`, `cli_season.py`의 각 cmd_* 가 화면 하나에 대응 (S2 홈=owner 인박스+다음 경기, S3=roster/fa, S4=player, S5 뎁스차트, S6=tactics, S7=gameplan, S8 매치 센터=sim-game --pbp, S10=standings, S13=injuries, S15=owner, S16=scout).
-- 진행 로직은 `season/runner.py`(play_game, sim_week, finish_week)를 그대로 호출하면 된다.
+## M6 웹 UI 계획 (다음 세션)
+스택(PRD §8.1, D12): FastAPI + Jinja2 + HTMX + Alpine.js, 드래그 앤 드롭 SortableJS, 차트 Chart.js (CDN, 빌드 도구 없음). 의존성은 `pyproject.toml`의 `web` extra(설치됨).
+완료 기준(PRD M6): 사용자가 브라우저에서 시즌 1회 완주. 화면 목록은 PRD §6 (S1–S16).
+
+원칙
+- 게임 로직은 새로 쓰지 않는다. 화면은 CLI와 같은 함수를 부른다: 진행 `season/runner.py`(play_game·sim_week·finish_week·ensure_owner), 순위 `season/standings.py`, 부상 `season/injuries.py`(report_rows·place_ir·can_activate·activate), 로스터 `season/roster.py`, 구단주 `season/owner.py`, 스카우팅 `season/knowledge.py`, 전술 `tactics/*`(cli_tactics.py 참고), 선수 프로필 로직 `cli_season.cmd_player`.
+- CLI 함수 안의 계산(출력 전 데이터 만들기)은 필요하면 `gridiron/web/views.py` 같은 곳으로 뽑아 CLI와 웹이 함께 쓴다.
+- 세이브 슬롯: `saves/*.sqlite` (gitignore). 요청마다 `load_league` → 처리 → 저장 함수. 한 사람용 로컬 앱이라 동시성은 신경 쓰지 않는다.
+- 실행: `uvicorn gridiron.web.app:app --reload` 또는 CLI `gridiron serve` 추가. 테스트는 FastAPI TestClient(httpx)로 화면별 200·핵심 문구 확인. 화면 확인은 Playwright(크로미움 설치됨)로 스크린샷.
+- 엔진 경기 1회 약 0.1초, 한 주 16경기 약 2초, 새 게임 구단주 투영 약 1분 → 긴 작업은 HTMX 진행 표시(폴링 또는 단계별 요청).
+
+하위 단계 (각각 커밋·푸시·이 파일 갱신)
+- [ ] **M6a 기반** — `gridiron/web/`(app.py, templates/base.html 레이아웃·내비, static/), S1 새 게임/불러오기(팀 선택, 슬롯), S2 홈(다음 경기, 이번 주 할 일, 구단주 인박스, 부상 요약, "경기 진행"·"주 진행" 버튼), `gridiron serve` 명령, TestClient 테스트.
+- [ ] **M6b 선수단** — S3 로스터(53/PS/IR 탭, 정렬·필터, FA 영입·방출·승격·임시 승격), S4 선수 프로필(능력치 등급 색상, 파악도 범위, PR·별점, 역할, 부상 이력, 기록), S5 뎁스차트(SortableJS 드래그, 공/수/특수 탭, 유효성 경고 F3-7, 자동 편성 버튼 F3-6), S13 부상 관리.
+- [ ] **M6c 전술·주간** — S6 전술(프리셋, 슬라이더, 상황별 성향 히트맵, 궁합·숙련도 미리보기, 예상 EPA 미리보기 F4-8d, 노출도 게이지 F5-7c), S7 게임플랜, S14 주간 훈련, S16 스카우팅.
+- [ ] **M6d 경기·리그** — S8 매치 센터(텍스트 중계 스트림, 스코어보드, 필드 바, 승률 그래프, 속도: 즉시/하이라이트/전체 F6-1), S9 경기 결과(박스스코어, 드라이브 차트 F6-4, 전술 리포트), S10 일정·순위·플레이오프 대진, S11 리그 통계·리더보드(F7-4), S15 구단주(신뢰도 그래프), S12 설정(해고 끄기, 시뮬 속도). 마지막에 브라우저로 시즌 1회 완주 확인.
+
+## 새 세션 시작 문구 (복사해서 사용)
+> CLAUDE.md와 docs/PROGRESS.md를 읽고 M6(웹 UI)를 진행해줘. PROGRESS.md의 M6a → M6b → M6c → M6d 순서로, 하위 단계마다 테스트·커밋·푸시하고 PROGRESS.md를 갱신해줘. 컨텍스트가 부족해지면 현재 단계까지 정리해서 커밋하고 다음 세션용 메모를 남겨줘.
 
 ## 메모
 - 시즌 진행 훅: 주 시작 `weekly.prepare_week`, 경기 후 `weekly.after_game`, 주 마감 `runner.finish_week`. M5b–d는 여기에 붙인다.
