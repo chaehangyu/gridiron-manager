@@ -7,6 +7,7 @@
     gridiron train --save saves/career.sqlite                       # 주간 훈련
     gridiron sim-game --save saves/career.sqlite --team KC --pbp
     gridiron sim-week --save saves/career.sqlite
+    gridiron sim-season --save saves/career.sqlite --quiet
     gridiron standings --save saves/career.sqlite
     gridiron quick --home KC --away BUF --pbp
 """
@@ -25,11 +26,6 @@ def _load_source(source: str, season: int) -> League:
         return generate_sample_league(season=season)
     from .data.real_league import load_real_league
     return load_real_league(season)
-
-
-def _seed_for(game: ScheduledGame, base: int = 0) -> int:
-    import zlib
-    return zlib.crc32(game.game_id.encode()) ^ base
 
 
 def _print_box(out, league: League) -> None:
@@ -78,17 +74,8 @@ def cmd_new(args) -> None:
 
 
 def _play(path: Path, league: League, game: ScheduledGame, user_team: str | None, pbp: bool, seed: int | None = None):
-    """경기 하나: 주간 훈련 적용(주 첫 경기) → 시뮬 → 저장 → 숙련도·스카우팅·컨디션 갱신 (M4)."""
-    from .db.store import record_game, save_team_state
-    from .engine.api import simulate
-    from .season.weekly import after_game, prepare_week
-    prepare_week(league, game.week)
-    out = simulate(league, game, seed=seed if seed is not None else _seed_for(game), play_by_play=pbp,
-                   user_team=user_team)
-    record_game(path, game, {"overtimes": out.overtimes}, out.seed, out.box, tactics=out.tactics)
-    after_game(league, out.tactics, out.box["players"])
-    save_team_state(path, league)
-    return out
+    from .season.runner import play_game
+    return play_game(path, league, game, user_team, pbp, seed)
 
 
 def cmd_sim_game(args) -> None:
@@ -106,44 +93,97 @@ def cmd_sim_game(args) -> None:
         if game is None:
             sys.exit(f"{week}주차에 {team}의 남은 경기가 없습니다 (바이위크이거나 이미 치렀습니다).")
     out = _play(path, league, game, user_team, True, args.seed)
+    from .season.runner import finish_week
+    notes = finish_week(path, league, game.week)
     if args.pbp:
         for line in render_game(out.play_by_play, [game.home, game.away]):
             print(line)
     _print_box(out, league)
     print_game_tactics(out, league, team)
+    for n in notes:
+        print(n)
 
 
-def cmd_sim_week(args) -> None:
-    from .db.store import load_league, set_week
-    path = Path(args.save)
-    league, user_team = load_league(path)
-    week = args.week or league.week
-    games = [g for g in league.games_in_week(week) if not g.played]
-    print(f"{league.season} 시즌 {week}주차 — {len(games)}경기")
-    for g in games:
-        out = _play(path, league, g, user_team, False)
+def _print_result(user_team: str | None):
+    def show(g: ScheduledGame, out) -> None:
         mark = " ◀" if user_team in (g.home, g.away) else ""
         ot = " (OT)" if out.overtimes else ""
         print(f"  {g.away:>3} {out.away_score:>2} @ {g.home:<3} {out.home_score:>2}{ot}{mark}")
-    if all(g.played for g in league.games_in_week(week)):
-        set_week(path, week + 1)
+    return show
+
+
+def _week_title(league: League) -> str:
+    from .season.runner import ROUND_LABEL
+    games = league.games_in_week(league.week)
+    kind = games[0].game_type if games else "REG"
+    return f"{league.season} 시즌 {league.week}주차" if kind == "REG" else f"{league.season} {ROUND_LABEL[kind]}"
+
+
+def cmd_sim_week(args) -> None:
+    from .db.store import load_league
+    from .season.runner import season_over, sim_week
+    path = Path(args.save)
+    league, user_team = load_league(path)
+    if season_over(league):
+        sys.exit("시즌이 끝났습니다. (오프시즌은 Post-MVP)")
+    print(f"{_week_title(league)} — {sum(not g.played for g in league.games_in_week(league.week))}경기")
+    for n in sim_week(path, league, user_team, _print_result(user_team)):
+        print(n)
+
+
+def cmd_sim_season(args) -> None:
+    """남은 주를 한 번에 진행한다 (--until regular: 정규시즌 끝까지, end: 슈퍼볼까지)."""
+    from .db.store import load_league
+    from .season.runner import season_over, sim_week
+    path = Path(args.save)
+    league, user_team = load_league(path)
+    while not season_over(league):
+        if args.until == "regular" and league.phase == "playoffs":
+            break
+        title = _week_title(league)
+        if args.quiet:
+            def show(g, out, title=title):
+                if user_team in (g.home, g.away):
+                    print(f"{title}: {g.away} {out.away_score} @ {g.home} {out.home_score}")
+        else:
+            print(title)
+            show = _print_result(user_team)
+        for n in sim_week(path, league, user_team, show):
+            print(n)
+    if season_over(league):
+        _print_standings(league, user_team)
+
+
+def _print_standings(league: League, user_team: str | None) -> None:
+    from .season import standings as ST
+    st = ST.compute(league)
+    seed_of = {t: i + 1 for s in st.seeds.values() for i, t in enumerate(s)}
+    for conf in ("AFC", "NFC"):
+        for div in ("East", "North", "South", "West"):
+            print(f"\n{conf} {div}")
+            for t in st.divisions[(conf, div)]:
+                r = st.rec(t)
+                mark = " ◀" if t == user_team else ""
+                seed = f"({seed_of[t]})" if t in seed_of else ""
+                print(f"  {seed:>3} {league.teams[t].name:<28} {r.text():>7}  득점 {r.pf:>3} 실점 {r.pa:>3}"
+                      f"  디비전 {st.table.rec(t, st.table.div_teams(t) - {t}).text()}{mark}")
+    for conf in ("AFC", "NFC"):
+        print(f"\n{conf} 플레이오프 시드: " + "  ".join(f"{i + 1}.{t}" for i, t in enumerate(st.seeds[conf])))
+    played = [g for g in league.schedule if g.game_type != "REG" and g.played]
+    if played:
+        from .season.runner import ROUND_LABEL
+        print("\n플레이오프")
+        for g in played:
+            print(f"  {ROUND_LABEL[g.game_type]:<10} {g.away:>3} {g.away_score:>2} @ {g.home:<3} {g.home_score:>2}")
+        champ = ST.champion(league)
+        if champ:
+            print(f"\n🏆 {league.teams[champ].name}")
 
 
 def cmd_standings(args) -> None:
-    from .db.store import load_league, standings
-    path = Path(args.save)
-    league, user_team = load_league(path)
-    rows = {r.team: r for r in standings(path, league.season)}
-    for conf in ("AFC", "NFC"):
-        for div in ("East", "North", "South", "West"):
-            teams = [t for t in league.teams.values() if t.conference == conf and t.division == div]
-            teams.sort(key=lambda t: (-(rows[t.abbr].wins + 0.5 * rows[t.abbr].ties), -(rows[t.abbr].points_for - rows[t.abbr].points_against)))
-            print(f"\n{conf} {div}")
-            for t in teams:
-                r = rows[t.abbr]
-                mark = " ◀" if t.abbr == user_team else ""
-                print(f"  {t.name:<28} {f'{r.wins}-{r.losses}-{r.ties}':>7}  득점 {r.points_for:>3} 실점 {r.points_against:>3}{mark}")
-    print("\n※ 순위는 승률·득실차 임시 정렬입니다. 공식 타이브레이커(nflseedR 포팅)는 M5에서 적용합니다.")
+    from .db.store import load_league
+    league, user_team = load_league(Path(args.save))
+    _print_standings(league, user_team)
 
 
 def cmd_quick(args) -> None:
@@ -214,7 +254,13 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--intensity", choices=["light", "normal", "hard"])
     p.set_defaults(func=cmd_train)
 
-    p = sub.add_parser("standings", help="순위표")
+    p = sub.add_parser("sim-season", help="남은 시즌을 한 번에 진행 (정규시즌·플레이오프)")
+    p.add_argument("--save", default="saves/career.sqlite")
+    p.add_argument("--until", choices=["regular", "end"], default="end")
+    p.add_argument("--quiet", action="store_true", help="우리 팀 경기만 출력")
+    p.set_defaults(func=cmd_sim_season)
+
+    p = sub.add_parser("standings", help="순위표 (공식 타이브레이커·시드)")
     p.add_argument("--save", default="saves/career.sqlite")
     p.set_defaults(func=cmd_standings)
 

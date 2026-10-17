@@ -212,15 +212,44 @@ def record_game(path: Path, game: ScheduledGame, result: dict, seed: int, box: d
 
 
 def set_week(path: Path, week: int) -> None:
-    eng = engine_for(path)
-    with Session(eng) as s:
-        meta = s.exec(select(S.LeagueRow)).one()
-        meta.week = week
-        s.add(meta)
-        s.commit()
+    set_progress(path, week=week)
 
 
 def standings(path: Path, season: int) -> list[S.TeamSeasonRow]:
     eng = engine_for(path)
     with Session(eng) as s:
         return list(s.exec(select(S.TeamSeasonRow).where(S.TeamSeasonRow.season == season)))
+
+
+def add_games(path: Path, games: list[ScheduledGame]) -> None:
+    """새로 만든 경기(플레이오프 대진)를 일정에 추가한다."""
+    eng = engine_for(path)
+    with Session(eng) as s:
+        for g in games:
+            if s.get(S.GameRow, g.game_id) is None:
+                s.add(S.GameRow(id=g.game_id, season=g.season, week=g.week, game_type=g.game_type, home=g.home,
+                                away=g.away, gameday=g.gameday, stadium=g.stadium, roof=g.roof, surface=g.surface,
+                                neutral_site=g.neutral_site))
+        s.commit()
+
+
+def set_progress(path: Path, week: int | None = None, phase: str | None = None) -> None:
+    eng = engine_for(path)
+    with Session(eng) as s:
+        meta = s.exec(select(S.LeagueRow)).one()
+        if week is not None:
+            meta.week = week
+        if phase is not None:
+            meta.phase = phase
+        s.add(meta)
+        s.commit()
+
+
+def set_playoff_results(path: Path, season: int, results: dict[str, str]) -> None:
+    eng = engine_for(path)
+    with Session(eng) as s:
+        for abbr, res in results.items():
+            ts = s.get(S.TeamSeasonRow, (abbr, season)) or S.TeamSeasonRow(team=abbr, season=season)
+            ts.playoff_result = res
+            s.add(ts)
+        s.commit()
