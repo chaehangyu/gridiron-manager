@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Callable
 
 from ..domain.models import League, ScheduledGame
-from . import injuries, roster, standings
+from . import injuries, owner, roster, standings
 from .weekly import after_game, prepare_week
 
 ROUND_LABEL = {"REG": "정규시즌", "WC": "와일드카드", "DIV": "디비저널", "CON": "컨퍼런스 챔피언십", "SB": "슈퍼볼",
@@ -25,19 +25,36 @@ def play_game(path: Path, league: League, game: ScheduledGame, user_team: str | 
               seed: int | None = None):
     from ..db.store import record_game, save_team_state
     from ..engine.api import simulate
-    start_week(path, league, game.week)
+    start_week(path, league, game.week, user_team)
     out = simulate(league, game, seed=seed if seed is not None else seed_for(game), play_by_play=pbp,
                    user_team=user_team)
     record_game(path, game, {"overtimes": out.overtimes}, out.seed, out.box, tactics=out.tactics)
     after_game(league, out.tactics, out.box["players"])
     injuries.apply_game(league, game, out.injuries)
     save_team_state(path, league)
+    if league.owner is not None and user_team in (game.home, game.away):
+        from ..db.store import save_owner
+        owner.after_game(league.owner, league, game)
+        save_owner(path, league)
     return out
 
 
-def start_week(path: Path, league: League, week: int) -> list[roster.Move]:
+def ensure_owner(path: Path, league: League, user_team: str | None) -> list[str]:
+    """사용자 팀 구단주 기대치·목표가 없으면 만든다 (엔진 파워 레이팅 + 200회 투영, 약 1분)."""
+    from ..db.store import save_owner
+    import os
+    if not user_team or league.owner is not None or league.phase == "offseason" \
+            or os.environ.get("GRIDIRON_OWNER") == "off":       # 테스트에서 엔진 1분 계산을 건너뛴다
+        return []
+    league.owner = owner.start_season(league, user_team)
+    save_owner(path, league)
+    return [m["text"] for m in league.owner.inbox]
+
+
+def start_week(path: Path, league: League, week: int, user_team: str | None = None) -> list[roster.Move]:
     """주 시작 (한 번만): 훈련·부상 리포트, 자동 관리 팀의 경기 당일 연습 스쿼드 임시 승격."""
     from ..db.store import record_transactions
+    ensure_owner(path, league, user_team)
     if league.prepared_week >= week:
         return []
     prepare_week(league, week)
@@ -87,6 +104,17 @@ def finish_week(path: Path, league: League, week: int, user_team: str | None = N
         league.phase = "offseason"
         set_playoff_results(path, league.season, standings.eliminated_round(league))
         notes.append(f"{league.season} 시즌 종료 — 우승 {league.teams[standings.champion(league)].name}")
+        if league.owner is not None and league.owner.grade is None:
+            owner.season_review(league.owner, league, path)
+    st = league.owner
+    if st is not None and user_team:
+        if user_team in played and league.phase == "regular":
+            owner.weekly_progress(st, league, week)
+        notes += [m["text"] for m in st.inbox if m["week"] == week or (m["kind"] == "review" and league.phase == "offseason")]
+        if st.fired and any(m["kind"] in ("fired", "review") and m["week"] == week for m in st.inbox):
+            notes.append("⚠ 해고되었습니다. 샌드박스로 계속 진행할 수 있습니다 (gridiron owner --firing off).")
+        from ..db.store import save_owner
+        save_owner(path, league)
     league.week = week + 1 if league.phase != "offseason" else week
     injuries.weekly_report(league, league.week)          # 다음 주 공식 부상 리포트
     set_progress(path, week=league.week, phase=league.phase)

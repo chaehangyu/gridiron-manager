@@ -92,7 +92,7 @@ def test_season_runner_end_to_end(tmp_path):
     notes = runner.finish_week(path, league, league.week)
     assert league.phase == "playoffs" and any("시드" in n for n in notes)
     while not runner.season_over(league):
-        runner.sim_week(path, league, user)
+        runner.sim_week(path, league, None)     # 구단주 계산(엔진 1분)은 test_owner에서
     again, _ = load_league(path)
     assert again.phase == "offseason" and ST.champion(again) == ST.champion(league)
     assert sum(g.game_type != "REG" for g in again.schedule) == 13

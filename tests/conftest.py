@@ -1,3 +1,4 @@
+import os
 import pytest
 
 from gridiron.data.sample import generate_sample_league
@@ -21,3 +22,7 @@ def init_game_sim(sample_league):
         return GameSim(teams, seed=seed)
 
     return make
+
+
+# 구단주 기대치(엔진 파워 레이팅, 약 1분)는 tests/test_owner.py에서 고정 레이팅으로 따로 검사한다
+os.environ.setdefault("GRIDIRON_OWNER", "off")

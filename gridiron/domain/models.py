@@ -175,6 +175,7 @@ class League:
     league_tendency: dict | None = None   # 지난 시즌 리그 평균 성향 (team_tendencies.json의 league)
     prepared_week: int = 0                # 주간 훈련을 적용한 마지막 주
     ir_returns_used: dict[str, int] = field(default_factory=dict)   # 팀 → 이번 시즌 IR 복귀 지정 횟수
+    owner: object = None                  # 사용자 팀 구단주 상태 (season.owner.OwnerState, M5d)
 
     def roster(self, abbr: str, statuses: tuple[RosterStatus, ...] = (RosterStatus.ACTIVE,)) -> list[Player]:
         return [p for p in self.players.values() if p.team == abbr and p.roster_status in statuses]

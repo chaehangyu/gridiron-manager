@@ -48,6 +48,7 @@ def save_league(league: League, path: Path, user_team: str | None = None) -> Non
 
 
 LEAGUE_STATE = "__league__"
+OWNER_STATE = "__owner__"
 
 
 def _player_row(p: Player) -> S.PlayerRow:
@@ -63,7 +64,7 @@ def save_team_state(path: Path, league: League) -> None:
     eng = engine_for(path)
     season, week = league.season, league.week
     with Session(eng) as s:
-        s.exec(delete(S.TacticsRow).where(S.TacticsRow.season == season))
+        s.exec(delete(S.TacticsRow).where((S.TacticsRow.season == season) & (S.TacticsRow.team != OWNER_STATE)))
         s.exec(delete(S.FamiliarityRow).where((S.FamiliarityRow.season == season) & (S.FamiliarityRow.week == week)))
         s.exec(delete(S.TrainingPlanRow).where((S.TrainingPlanRow.season == season) & (S.TrainingPlanRow.week == week)))
         for t in league.teams.values():
@@ -171,6 +172,8 @@ def _load_team_state(s: Session, league: League) -> bool:
     if not rows:
         return False
     for r in rows:
+        if r.team == OWNER_STATE:
+            continue
         if r.team == LEAGUE_STATE:
             league.prepared_week = r.payload.get("prepared_week", 0)
             league.league_tendency = r.payload.get("league_tendency")
@@ -254,6 +257,7 @@ def load_league(path: Path) -> tuple[League, str | None]:
                 from ..tactics import familiarity
                 for t in league.teams.values():
                     t.familiarity = familiarity.initial(t.front.value, None, None)
+        load_owner(path, league)
         return league, meta.user_team
 
 
@@ -355,3 +359,39 @@ def transactions(path: Path, season: int, team: str | None = None) -> list[S.Tra
         if team:
             q = q.where(S.TransactionRow.team == team)
         return list(s.exec(q.order_by(S.TransactionRow.id)))
+
+
+
+def save_owner(path: Path, league: League) -> None:
+    """구단주 상태: 전체 상태(JSON) + 기대치·주간 신뢰도·시즌 평가 행 (PRD F12)."""
+    st = league.owner
+    if st is None:
+        return
+    eng = engine_for(path)
+    with Session(eng) as s:
+        s.exec(delete(S.TacticsRow).where((S.TacticsRow.team == OWNER_STATE) & (S.TacticsRow.season == st.season)))
+        s.add(S.TacticsRow(team=OWNER_STATE, season=st.season, layer="state", week=0, payload=st.to_dict()))
+        s.merge(S.OwnerExpectationRow(team=st.team, season=st.season, tier=st.tier, projected_wins_mean=st.wins_mean,
+                                      projected_wins_sd=st.wins_sd, main_goal=st.main_goal, sub_goals=st.sub_goals))
+        s.exec(delete(S.OwnerConfidenceRow).where((S.OwnerConfidenceRow.team == st.team)
+                                                  & (S.OwnerConfidenceRow.season == st.season)))
+        last = {}
+        for week, value, reason in st.history:
+            last[week] = (value, reason)
+        for week, (value, reason) in last.items():
+            s.add(S.OwnerConfidenceRow(team=st.team, season=st.season, week=week, value=value, reason=reason))
+        if st.grade:
+            s.merge(S.OwnerReviewRow(team=st.team, season=st.season, grade=st.grade, fired=st.fired))
+        s.commit()
+
+
+def load_owner(path: Path, league: League) -> None:
+    from ..season.owner import OwnerState
+    eng = engine_for(path)
+    with Session(eng) as s:
+        row = s.exec(select(S.TacticsRow).where((S.TacticsRow.team == OWNER_STATE)
+                                                & (S.TacticsRow.season == league.season))).first()
+        if row is not None:
+            d = dict(row.payload)
+            d["history"] = [tuple(h) for h in d.get("history", [])]
+            league.owner = OwnerState.from_dict(d)

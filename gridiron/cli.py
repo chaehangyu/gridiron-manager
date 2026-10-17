@@ -71,6 +71,13 @@ def cmd_new(args) -> None:
     save_league(league, Path(args.save), user_team=args.team)
     t = league.teams.get(args.team) if args.team else None
     print(f"새 게임 저장: {args.save} ({league.source}, {league.season} 시즌, 팀 {t.name if t else '-'})")
+    if args.team and not args.quick:
+        from .db.store import load_league
+        from .season.runner import ensure_owner
+        print("구단주 기대치 계산 중 (엔진 파워 레이팅 + 200시즌 투영, 약 1분)…")
+        lg, user = load_league(Path(args.save))
+        for line in ensure_owner(Path(args.save), lg, user):
+            print(line)
 
 
 def _play(path: Path, league: League, game: ScheduledGame, user_team: str | None, pbp: bool, seed: int | None = None):
@@ -212,6 +219,7 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--season", type=int, default=2026)
     p.add_argument("--team", help="사용자 팀 약어 (예: KC)")
     p.add_argument("--save", default="saves/career.sqlite")
+    p.add_argument("--quick", action="store_true", help="구단주 기대치 계산을 첫 경기 때로 미룬다")
     p.set_defaults(func=cmd_new)
 
     p = sub.add_parser("sim-game", help="한 경기 시뮬레이션 (기본: 사용자 팀의 이번 주 경기)")

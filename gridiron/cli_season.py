@@ -155,7 +155,48 @@ def cmd_fa(args) -> None:
               f"경력 {p.years_exp}년")
 
 
+def cmd_owner(args) -> None:
+    from .db.store import load_league, save_owner
+    from .season import owner as O
+    from .season.runner import ensure_owner
+    path = Path(args.save)
+    league, user_team = load_league(path)
+    for line in ensure_owner(path, league, user_team):
+        print(line)
+    st = league.owner
+    if st is None:
+        sys.exit("사용자 팀이 없습니다.")
+    if args.firing:
+        st.firing = args.firing == "on"
+        if not st.firing and st.fired:
+            st.fired = False
+            print("샌드박스 모드: 해고 없이 계속합니다.")
+        save_owner(path, league)
+    pr = st.projection
+    print(f"\n{league.teams[st.team].name} 구단주 — {O.TIERS[st.tier]}")
+    print(f"  예상 {st.wins_mean:.1f}승 (±{st.wins_sd:.1f}), 플레이오프 {pr.get('p_playoffs', 0) * 100:.0f}%, "
+          f"컨퍼런스 결승 {pr.get('p_conf_final', 0) * 100:.0f}%, 우승 {pr.get('p_title', 0) * 100:.0f}%")
+    res = O.goal_results(st, league, path) if any(g.played for g in league.schedule) else {}
+    mark = lambda g: "" if g not in res else (" ✓" if res[g] else " ✗")  # noqa: E731
+    print(f"  주 목표: {O.goal_label(st.main_goal)}{mark(st.main_goal)}")
+    for g in st.sub_goals:
+        print(f"  보조 목표: {O.SUB_GOALS[g]}{mark(g)}")
+    bar = "█" * int(st.confidence / 5)
+    print(f"  신뢰도 {st.confidence:.0f}/100 {bar}  경고 {st.warnings}/2  해고 {'켜짐' if st.firing else '꺼짐'}"
+          + (f"  시즌 평가 {st.grade}" if st.grade else "") + ("  [해고됨]" if st.fired else ""))
+    print("  최근 변화: " + " · ".join(f"{w}주 {v:.0f} ({r})" for w, v, r in st.history[-5:]))
+    print("\n인박스")
+    for m in st.inbox[-args.inbox:]:
+        print(f"  [{m['week']}주] {m['text']}")
+
+
 def add_parsers(sub) -> None:
+    p = sub.add_parser("owner", help="구단주 목표·신뢰도·인박스 (F12)")
+    p.add_argument("--save", default="saves/career.sqlite")
+    p.add_argument("--firing", choices=["on", "off"], help="해고 켜기/끄기 (끄면 샌드박스)")
+    p.add_argument("--inbox", type=int, default=8)
+    p.set_defaults(func=cmd_owner)
+
     p = sub.add_parser("roster", help="로스터·연습 스쿼드·경기 당일 명단 (F3)")
     p.add_argument("--save", default="saves/career.sqlite")
     p.add_argument("--team")
