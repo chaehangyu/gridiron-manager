@@ -13,7 +13,7 @@ from typing import Any, Optional
 from sqlalchemy import JSON, Column
 from sqlmodel import Field, SQLModel
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2   # 2: 부상 진행·선수 시즌 상태 (M5)
 
 
 def JsonField(default_factory: Any = dict) -> Any:  # noqa: N802
@@ -185,8 +185,22 @@ class InjuryRow(SQLModel, table=True):
     diagnosed_min_weeks: int
     diagnosed_max_weeks: int
     actual_weeks: int
-    status: str = "out"
+    status: str = "out"                    # out | doubtful | questionable | healed
     reinjury_risk_until_week: Optional[int] = None
+    season: int = Field(default=0, index=True)
+    week: int = 0
+    weeks_remaining: int = 0
+    missed: int = 0
+    practice: str = "full"
+    sit: bool = False
+
+
+class PlayerStateRow(SQLModel, table=True):
+    """선수의 시즌 중 상태 (재부상 위험·경기 감각·IR 등재 주·뇌진탕 횟수 등, M5)."""
+    __tablename__ = "player_state"
+    player_id: str = Field(primary_key=True)
+    season: int = Field(primary_key=True)
+    payload: dict = JsonField(default_factory=dict)
 
 
 class PracticeReportRow(SQLModel, table=True):

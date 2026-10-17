@@ -49,8 +49,11 @@ class GameSim:
     def __init__(self, teams: list[TeamGameSim], *, settings: GameSettings | None = None,
                  outcome: OutcomeModel | None = None, seed: int | None = None, do_play_by_play: bool = False,
                  playoffs: bool = False, neutral_site: bool = False, home_court_factor: float = 1.0,
-                 gid: str = "", venue: dict | None = None, norms: dict | None = None) -> None:
+                 gid: str = "", venue: dict | None = None, norms: dict | None = None,
+                 injury_model=None) -> None:
         self.id = gid
+        self.injury_model = injury_model   # engine.injury.InjuryModel (없으면 원본 단일 위험률)
+        self.play_no = 0
         self.settings = settings or GameSettings()
         self.outcome: OutcomeModel = outcome or FbgmOutcome()
         self.rng = Rng(seed)
@@ -529,7 +532,10 @@ class GameSim:
                             players.append(p)
                             used.add(p.id)
                     if len(players) < num:
-                        for p in depth:
+                        # 긴급 투입 (F10-4c): 이 포지션이 바닥나면 다른 포지션에서 이 자리 종합치가 가장 높은 선수
+                        spare = sorted((p for p in self.team[t].players if not p.injured and p.id not in used),
+                                       key=lambda p: -p.ovrs.get(pos, 0))
+                        for p in spare + [p for p in depth if p.id not in used]:
                             if len(players) >= num:
                                 break
                             if p.id not in used:
@@ -967,6 +973,10 @@ class GameSim:
                     p.stat["energy"] = min(1.0, p.stat["energy"] + 0.5)
 
     def injuries(self) -> None:
+        model = self.injury_model
+        if model is not None:
+            self._injuries_model(model)
+            return
         base = self.settings.base_injury_rate
         if base == 0:
             return
@@ -981,6 +991,34 @@ class GameSim:
                     p.new_injury = True
                     self.playByPlay.logEvent({"type": "injury", "injuredPID": p.id, "names": [f"{p.pos} {p.name}"],
                                               "t": t})
+
+    def _injuries_model(self, model) -> None:
+        """실측 부상 모델 (M5b): 경기 중 복귀 처리 → 필드 위 선수 위험 판정."""
+        self.play_no += 1
+        for t in TEAM_NUMS:
+            for p in self.team[t].players:
+                if p.injured and p.return_at is not None and self.play_no >= p.return_at:
+                    p.injured, p.return_at, p.playing_through_injury = False, None, True
+                    p.injury["returned"] = True
+                    self.playByPlay.logEvent({"type": "injuryReturn", "injuredPID": p.id,
+                                              "names": [f"{p.pos} {p.name}"], "t": t})
+            on_field = {p for players in self.playersOnField[t].values() for p in players}
+            for p in sorted(on_field, key=lambda x: x.id):
+                if p.injured:
+                    continue
+                h, hs = model.hazard(p, p.stat["energy"])
+                r = self.rng.random()
+                if r >= h + hs:
+                    continue
+                inj = model.draw(p, self.rng, severe=r >= h)
+                inj["returned"] = False
+                p.injured, p.new_injury, p.injury = True, True, inj
+                back = model.may_return(p, inj, t, self.rng)
+                if back:
+                    p.return_at = self.play_no + 3 + int(self.rng.random() * 12)
+                self.playByPlay.logEvent({"type": "injury", "injuredPID": p.id, "names": [f"{p.pos} {p.name}"],
+                                          "t": t, "label": inj["label"], "part": inj["part"],
+                                          "status": "questionable" if back else "out"})
 
     def pickPlayer(self, t: int, rating: str | None = None, positions: Iterable[str] | None = None,
                    power: float = 1.0) -> PlayerGameSim:

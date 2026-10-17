@@ -1,0 +1,44 @@
+# 부상 모델 (PRD F10, M5b). 발생률·부위·결장 분포 원천은 data/baseline/injuries.json (tools/research/injury_rates.py).
+scale: 0.82                # 전체 발생률 보정 (tools/check_injuries.py로 실측 2.19건/팀경기에 맞춘다)
+silent_factor: 0.6         # 리포트 밖 시즌 아웃(상한 추정)에서 방출·트레이드 몫을 뺀 비율
+age_rate: 1.03             # 26세 기준 연 3% 증가 (Football GM)
+playing_through: 1.5       # 부상 안고 출전 (Football GM)
+durability_k: 0.05         # 내구성 1점당 위험 exp(−k·(d−10.5))
+recovery_k: 0.04           # 회복력 1점당 결장 분위수 지수 exp(k·(r−10.5))
+fatigue_k: 0.6             # 경기 내 에너지 1 → 0일 때 위험 +60% (연조직 부상과 연결)
+turf: 1.04                 # 인조잔디
+reinjury_mult: 1.6
+reinjury_weeks: {default: 3, hamstring: 5, groin: 4, calf: 4, ankle: 3, knee: 4, concussion: 4}
+rust_cond: 0.97            # 2경기 이상 결장 후 첫 경기 경기 감각 페널티 (컨디션 배율)
+hurt_cond: 0.97            # Questionable 강행 출전 성능 배율
+repeat_concussion_extra: 1 # 시즌 내 두 번째 뇌진탕부터 결장 +1경기
+long_weeks: [8, 14]        # "8경기 이상" 칸에서 시즌 아웃이 아닐 때 결장 범위
+long_season_ending: 0.5    # "8경기 이상" 칸 중 시즌 아웃 비율
+in_game_return:            # 경미한(다음 경기 출전 가능) 부상의 경기 중 복귀 확률 — 부상 위험 정책(F4-4)
+  conservative: 0.3
+  standard: 0.65
+  aggressive: 0.95
+ir_auto_weeks: 4           # AI·자동 관리: 예상 결장 이 이상이면 IR
+
+severe_parts: {knee: 0.45, achilles: 0.15, ankle: 0.15, shoulder: 0.1, pectoral: 0.08, arm: 0.07}
+
+labels:                    # 부위 → (기본 이름, 장기 결장일 때 이름)
+  knee: [무릎 염좌, 무릎 십자인대 파열]
+  ankle: [발목 염좌, 하이 앵클 스프레인]
+  hamstring: [햄스트링 부상, 햄스트링 파열]
+  concussion: [뇌진탕, 뇌진탕]
+  shoulder: [어깨 부상, 어깨 탈구]
+  back: [허리 부상, 허리 디스크]
+  groin: [사타구니 부상, 사타구니 파열]
+  ribs: [갈비뼈 타박상, 갈비뼈 골절]
+  foot: [발 부상, 발 골절(리스프랑)]
+  hip: [고관절 부상, 고관절 부상]
+  calf: [종아리 부상, 종아리 파열]
+  thigh: [대퇴부 타박상, 대퇴사두근 파열]
+  hand: [손 부상, 손 골절]
+  neck: [목 부상, 목 부상]
+  arm: [팔 부상, 팔 골절]
+  toe: [발가락 부상(턴 토), 발가락 부상(턴 토)]
+  pectoral: [가슴 근육 부상, 대흉근 파열]
+  achilles: [아킬레스건 통증, 아킬레스건 파열]
+  other: [부상, 부상]

@@ -38,12 +38,19 @@ class RosterStatus(str, Enum):
 @dataclass
 class Injury:
     body_part: str
-    type: str
+    type: str                 # 표시 이름 (예: 발목 염좌)
     severity: str
-    weeks_out_min: int
+    weeks_out_min: int        # 진단 범위 (사용자에게 보이는 값)
     weeks_out_max: int
-    weeks_remaining: int
-    status: str = "out"  # out | doubtful | questionable | healthy
+    weeks_remaining: int      # 실제 남은 결장 경기 수 (숨김). 99 = 시즌 아웃
+    status: str = "out"       # out | doubtful | questionable | healthy (주간 공식 리포트)
+    season: int = 0
+    week: int = 0             # 다친 주
+    game_id: str | None = None
+    missed: int = 0           # 지금까지 결장한 경기 수
+    practice: str = "full"    # 이번 주 훈련 참여: dnp | limited | full
+    sit: bool = False         # Questionable이어도 쉬게 함 (사용자 결정)
+    id: int | None = None     # 세이브 행 id
 
 
 @dataclass
@@ -67,6 +74,11 @@ class Player:
     condition: float = 100.0   # 주간 컨디션 0–100
     injury: Injury | None = None
     ratings_source: str = "provisional"  # provisional | measured:measured | measured:prior | sample
+    # ── 부상 이력·복귀 관리 (F10-6, M5b) ──
+    reinjury_until: int = 0        # 이 주까지 재부상 위험 증가 (같은 시즌 주차)
+    rust_games: int = 0            # 남은 경기 감각 페널티 경기 수
+    ir_week: int | None = None     # IR 등재 주
+    concussions: int = 0           # 이번 시즌 뇌진탕 횟수
 
     def __post_init__(self) -> None:
         missing = [k for k in ATTR_KEYS if k not in self.attributes]
@@ -81,7 +93,13 @@ class Player:
 
     @property
     def injured(self) -> bool:
-        return self.injury is not None and self.injury.weeks_remaining > 0
+        """이번 주 경기에 못 나간다 (결장 중이거나 Questionable인데 쉬게 함)."""
+        return self.injury is not None and (self.injury.weeks_remaining > 0 or self.injury.sit)
+
+    @property
+    def hurt(self) -> bool:
+        """부상을 안고 뛴다 (Questionable 강행)."""
+        return self.injury is not None and not self.injured
 
 
 @dataclass
@@ -151,6 +169,7 @@ class League:
     source: str = "sample"  # sample | nflverse
     league_tendency: dict | None = None   # 지난 시즌 리그 평균 성향 (team_tendencies.json의 league)
     prepared_week: int = 0                # 주간 훈련을 적용한 마지막 주
+    ir_returns_used: dict[str, int] = field(default_factory=dict)   # 팀 → 이번 시즌 IR 복귀 지정 횟수
 
     def roster(self, abbr: str, statuses: tuple[RosterStatus, ...] = (RosterStatus.ACTIVE,)) -> list[Player]:
         return [p for p in self.players.values() if p.team == abbr and p.roster_status in statuses]

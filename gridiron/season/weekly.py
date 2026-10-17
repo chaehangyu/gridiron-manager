@@ -37,6 +37,8 @@ def prepare_week(league: League, week: int) -> None:
         team.prep = prep
         for p in league.roster(team.abbr):
             p.condition = max(0.0, min(100.0, p.condition + WEEKLY_RECOVERY + cond))
+    from .injuries import weekly_report
+    weekly_report(league, week)
     league.prepared_week = week
 
 

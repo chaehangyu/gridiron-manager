@@ -62,6 +62,7 @@ class Predictability:
 class GameManagement:
     fourth_down: str = "standard"
     two_point: str = "chart"
+    injury_risk: str = "standard"         # 부상 위험 정책 (F4-4·F10-4b): conservative | standard | aggressive
 
 
 @dataclass
@@ -109,6 +110,8 @@ class Tactics:
             errs.append(f"러닝 스타일은 {RUN_STYLES}")
         if not 0 <= self.predictability.lam <= 0.7:
             errs.append("상대 대응 강도는 0–0.7")
+        if self.management.injury_risk not in ("conservative", "standard", "aggressive"):
+            errs.append("부상 위험 정책은 conservative | standard | aggressive")
         if self.predictability.tendency_break not in TENDENCY_BREAK:
             errs.append(f"성향 깨기는 {TENDENCY_BREAK}")
         if not -1 <= d.man_zone <= 1 or not -1 <= d.box <= 1 or not -1 <= o.qb_style <= 1:

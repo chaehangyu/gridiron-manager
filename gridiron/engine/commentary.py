@@ -102,7 +102,14 @@ def render(ev: dict, abbrs: list[str], state: dict) -> str | None:
             return f"   🚩 {abbrs[ev['t']]} {ev['penaltyNameKo']}{who} — 상쇄"
         return f"   🚩 {abbrs[ev['t']]} {ev['penaltyNameKo']}{who} {ev['yds']}야드 — {dec}"
     if typ == "injury":
+        if ev.get("label"):
+            after = "복귀 여부 미정" if ev.get("status") == "questionable" else "라커룸 이동 — 복귀 불가"
+            if ev.get("part") == "concussion":
+                after = "뇌진탕 프로토콜 — 복귀 불가"
+            return f"   ✚ 부상: {names[0]} ({team}), {ev['label']} — {after}"
         return f"   ✚ 부상: {names[0]} ({team})"
+    if typ == "injuryReturn":
+        return f"   ✚ 복귀: {names[0]} ({team}) 다시 경기에 나선다"
     return None
 
 

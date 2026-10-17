@@ -128,14 +128,24 @@ def ovr(comp: dict[str, float], pos: str, player_pos: str) -> float:
     return r
 
 
-def to_game_player(p: Player, engine_pos: str, on_day: date) -> PlayerGameSim:
+def to_game_player(p: Player, engine_pos: str, on_day: date, week: int | None = None) -> PlayerGameSim:
     r = fbgm_ratings(p)
     comp = composite_ratings(r)
     ovrs = {pos: ovr(comp, pos, engine_pos) for pos in OVR_INFO}
     # 주간 컨디션 85 이상은 영향 없음, 그 아래로 1점당 0.2% (PRD F2-4b)
     cond = 1.0 - 0.002 * max(0.0, 85.0 - p.condition)
+    # 부상 (M5b): 강행 출전·경기 감각 페널티, 내구성·재부상 위험 배율
+    from .injury import cfg as inj_cfg, durability_mult
+    ic = inj_cfg()
+    if p.hurt:
+        cond *= ic["hurt_cond"]
+    if p.rust_games > 0:
+        cond *= ic["rust_cond"]
+    mult = durability_mult(p.attributes.get("durability", 10.5))
+    if p.reinjury_until and week is not None and week <= p.reinjury_until:
+        mult *= ic["reinjury_mult"]
     return PlayerGameSim(id=p.id, name=p.name, pos=engine_pos, age=p.age_on(on_day), composite=comp, ovrs=ovrs,
-                         attributes=dict(p.attributes), playing_through_injury=p.injured, cond=cond)
+                         attributes=dict(p.attributes), playing_through_injury=p.hurt, cond=cond, inj_mult=mult)
 
 
 def build_team(league: League, abbr: str, team_num: int, on_day: date, week: int | None = None,
@@ -145,7 +155,8 @@ def build_team(league: League, abbr: str, team_num: int, on_day: date, week: int
     team: Team = league.teams[abbr]
     roster = [p for p in league.players.values()
               if p.team == abbr and p.roster_status == RosterStatus.ACTIVE and not p.injured]
-    cache: dict[str, PlayerGameSim] = {p.id: to_game_player(p, POSITION_TO_ENGINE[p.position], on_day) for p in roster}
+    cache: dict[str, PlayerGameSim] = {p.id: to_game_player(p, POSITION_TO_ENGINE[p.position], on_day, week)
+                                       for p in roster}
     depth_ids = engine_depth(team, {p.id: p for p in roster})
     depth = {pos: [cache[i] for i in ids if i in cache] for pos, ids in depth_ids.items()}
     return TeamGameSim(id=team_num, abbr=abbr, players=list(cache.values()), depth=depth, front=team.front.value,

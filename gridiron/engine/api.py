@@ -38,6 +38,7 @@ class GameOutcome:
     scoring_summary: list[dict] = field(default_factory=list)
     wp_series: list[tuple] = field(default_factory=list)
     tactics: dict = field(default_factory=dict)     # 팀별 전술 리포트 (DataOutcome.report)
+    injuries: list[dict] = field(default_factory=list)   # 이번 경기 부상 (M5b): pid, team, part, missed, …
 
 
 def prepare_teams(league: League, game: ScheduledGame, user_team: str | None = None):
@@ -56,15 +57,23 @@ def prepare_teams(league: League, game: ScheduledGame, user_team: str | None = N
 
 def simulate(league: League, game: ScheduledGame, seed: int, *, outcome: OutcomeModel | None = None,
              settings: GameSettings | None = None, play_by_play: bool = True,
-             user_team: str | None = None) -> GameOutcome:
+             user_team: str | None = None, injuries: bool = True) -> GameOutcome:
     home, away = prepare_teams(league, game, user_team)
+    inj_model = None
+    if injuries:
+        from .injury import InjuryModel
+        surf = (game.surface or "grass").lower()
+        policies = {i: getattr(t.tactics.management, "injury_risk", "standard") if t.tactics else "standard"
+                    for i, t in enumerate((home, away))}
+        inj_model = InjuryModel(turf="grass" not in surf and game.roof not in ("dome", "closed") or "turf" in surf,
+                                policies=policies)
     if outcome is None:
         from .outcome.data_model import DataOutcome
         outcome = DataOutcome.for_league(league, explain=play_by_play)
     sim = GameSim([home, away], settings=settings or GameSettings.from_config(), outcome=outcome, seed=seed,
                   do_play_by_play=play_by_play, playoffs=game.game_type != "REG", neutral_site=game.neutral_site,
                   gid=game.game_id, venue={"roof": game.roof, "surface": game.surface},
-                  norms=compute_norms(league))
+                  norms=compute_norms(league), injury_model=inj_model)
     res = sim.run()
     teams = {t.abbr: _clean(t.stat) for t in res["team"]}
     players = {}
@@ -77,7 +86,9 @@ def simulate(league: League, game: ScheduledGame, seed: int, *, outcome: Outcome
     game.away_score = int(res["team"][1].stat["pts"])
     events = [e for e in res["playByPlay"] if e["type"] != "clock"] if play_by_play else []
     tactics = outcome.report() if hasattr(outcome, "report") else {}
+    new_inj = [{"pid": p.id, "team": t.abbr, **p.injury} for t in res["team"] for p in t.players
+               if p.injury is not None]
     return GameOutcome(game=game, seed=seed, home_score=game.home_score, away_score=game.away_score,
                        overtimes=res["overtimes"], box={"teams": teams, "players": players, "plays": events},
                        play_by_play=res["playByPlay"], scoring_summary=res["scoringSummary"], wp_series=sim.wp_series,
-                       tactics=tactics)
+                       tactics=tactics, injuries=new_inj)

@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Callable
 
 from ..domain.models import League, ScheduledGame
-from . import standings
+from . import injuries, standings
 from .weekly import after_game, prepare_week
 
 ROUND_LABEL = {"REG": "정규시즌", "WC": "와일드카드", "DIV": "디비저널", "CON": "컨퍼런스 챔피언십", "SB": "슈퍼볼",
@@ -30,17 +30,23 @@ def play_game(path: Path, league: League, game: ScheduledGame, user_team: str | 
                    user_team=user_team)
     record_game(path, game, {"overtimes": out.overtimes}, out.seed, out.box, tactics=out.tactics)
     after_game(league, out.tactics, out.box["players"])
+    injuries.apply_game(league, game, out.injuries)
     save_team_state(path, league)
     return out
 
 
-def finish_week(path: Path, league: League, week: int) -> list[str]:
+def finish_week(path: Path, league: League, week: int, user_team: str | None = None) -> list[str]:
     """이번 주 경기가 모두 끝났으면 다음 단계로 넘긴다. 사용자에게 보여줄 알림을 돌려준다."""
     from ..db.store import add_games, set_playoff_results, set_progress
     games = league.games_in_week(week)
     if not games or not all(g.played for g in games):
         return []
     notes: list[str] = []
+    played = {t for g in games for t in (g.home, g.away)}
+    injuries.after_week(league, week, played)
+    for team, p, move in injuries.auto_ir(league, week, set(league.teams)):
+        if team == user_team:
+            notes.append(f"{p.name}({p.position.value}) " + ("IR 등재" if move == "ir" else "IR 복귀"))
     new = standings.next_round(league)
     if new:
         league.schedule.extend(new)
@@ -57,7 +63,10 @@ def finish_week(path: Path, league: League, week: int) -> list[str]:
         set_playoff_results(path, league.season, standings.eliminated_round(league))
         notes.append(f"{league.season} 시즌 종료 — 우승 {league.teams[standings.champion(league)].name}")
     league.week = week + 1 if league.phase != "offseason" else week
+    injuries.weekly_report(league, league.week)          # 다음 주 공식 부상 리포트
     set_progress(path, week=league.week, phase=league.phase)
+    from ..db.store import save_team_state
+    save_team_state(path, league)
     return notes
 
 
@@ -68,7 +77,7 @@ def sim_week(path: Path, league: League, user_team: str | None,
         out = play_game(path, league, g, user_team)
         if on_game:
             on_game(g, out)
-    return finish_week(path, league, week)
+    return finish_week(path, league, week, user_team)
 
 
 def season_over(league: League) -> bool:

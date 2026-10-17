@@ -75,14 +75,76 @@ def save_team_state(path: Path, league: League) -> None:
             s.add(S.TrainingPlanRow(team=t.abbr, season=season, week=week, main_focus=tp.main, sub_focus=tp.sub,
                                     intensity=tp.intensity))
         s.add(S.TacticsRow(team=LEAGUE_STATE, season=season, layer="state", week=0,
-                           payload={"prepared_week": league.prepared_week, "league_tendency": league.league_tendency}))
-        conds = {p.id: p.condition for p in league.players.values()}
+                           payload={"prepared_week": league.prepared_week, "league_tendency": league.league_tendency,
+                                    "ir_returns_used": league.ir_returns_used}))
+        players = league.players
         for row in s.exec(select(S.PlayerRow)):
-            c = conds.get(row.id)
-            if c is not None and abs((row.condition or 0) - c) > 1e-9:
-                row.condition = c
+            p = players.get(row.id)
+            if p is None:
+                continue
+            if (abs((row.condition or 0) - p.condition) > 1e-9 or row.team != p.team
+                    or row.roster_status != p.roster_status.value):
+                row.condition, row.team, row.roster_status = p.condition, p.team, p.roster_status.value
                 s.add(row)
+        _save_injuries(s, league)
         s.commit()
+
+
+def _player_state(p: Player) -> dict:
+    return {k: v for k, v in (("reinjury_until", p.reinjury_until), ("rust_games", p.rust_games),
+                              ("ir_week", p.ir_week), ("concussions", p.concussions)) if v}
+
+
+def _save_injuries(s: Session, league: League) -> None:
+    """부상 이력(InjuryRow, 회복하면 healed)과 선수 시즌 상태 저장."""
+    season = league.season
+    open_rows = {r.id: r for r in s.exec(select(S.InjuryRow).where((S.InjuryRow.season == season)
+                                                                   & (S.InjuryRow.status != "healed")))}
+    live = set()
+    for p in league.players.values():
+        inj = p.injury
+        if inj is None:
+            continue
+        row = open_rows.get(inj.id) if inj.id is not None else None
+        if row is None:
+            row = S.InjuryRow(player_id=p.id, game_id=inj.game_id, body_part=inj.body_part, type=inj.type,
+                              severity=inj.severity, diagnosed_min_weeks=inj.weeks_out_min,
+                              diagnosed_max_weeks=inj.weeks_out_max, actual_weeks=inj.weeks_remaining,
+                              season=season, week=inj.week)
+        row.status, row.weeks_remaining, row.missed = inj.status, inj.weeks_remaining, inj.missed
+        row.practice, row.sit = inj.practice, inj.sit
+        s.add(row)
+        s.flush()
+        inj.id = row.id
+        live.add(row.id)
+    for rid, row in open_rows.items():
+        if rid not in live:
+            row.status = "healed"
+            row.reinjury_risk_until_week = league.players[row.player_id].reinjury_until \
+                if row.player_id in league.players else None
+            s.add(row)
+    s.exec(delete(S.PlayerStateRow).where(S.PlayerStateRow.season == season))
+    for p in league.players.values():
+        st = _player_state(p)
+        if st:
+            s.add(S.PlayerStateRow(player_id=p.id, season=season, payload=st))
+
+
+def _load_injuries(s: Session, league: League) -> None:
+    from ..domain.models import Injury
+    for r in s.exec(select(S.InjuryRow).where((S.InjuryRow.season == league.season) & (S.InjuryRow.status != "healed"))):
+        p = league.players.get(r.player_id)
+        if p is None:
+            continue
+        p.injury = Injury(body_part=r.body_part, type=r.type, severity=r.severity, weeks_out_min=r.diagnosed_min_weeks,
+                          weeks_out_max=r.diagnosed_max_weeks, weeks_remaining=r.weeks_remaining, status=r.status,
+                          season=r.season, week=r.week, game_id=r.game_id, missed=r.missed, practice=r.practice,
+                          sit=r.sit, id=r.id)
+    for r in s.exec(select(S.PlayerStateRow).where(S.PlayerStateRow.season == league.season)):
+        p = league.players.get(r.player_id)
+        if p is not None:
+            for k, v in r.payload.items():
+                setattr(p, k, v)
 
 
 def _load_team_state(s: Session, league: League) -> bool:
@@ -97,6 +159,7 @@ def _load_team_state(s: Session, league: League) -> bool:
         if r.team == LEAGUE_STATE:
             league.prepared_week = r.payload.get("prepared_week", 0)
             league.league_tendency = r.payload.get("league_tendency")
+            league.ir_returns_used = dict(r.payload.get("ir_returns_used") or {})
             continue
         t = league.teams.get(r.team)
         if t is None:
@@ -162,6 +225,7 @@ def load_league(path: Path) -> tuple[League, str | None]:
                     for r in s.exec(select(S.GameRow).order_by(S.GameRow.week, S.GameRow.gameday, S.GameRow.id))]
         league = League(season=meta.season, teams=teams, players=players, schedule=schedule, week=meta.week,
                         phase=meta.phase, source=meta.source)
+        _load_injuries(s, league)
         if not _load_team_state(s, league):
             # M3 이전 세이브: 실측 성향으로 전술·숙련도 시작값을 채운다
             if league.source == "nflverse":

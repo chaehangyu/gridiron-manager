@@ -26,6 +26,9 @@ class PlayerGameSim:
     cond: float = 1.0             # 주간 컨디션 배율 (M4)
     new_injury: bool = False
     playing_through_injury: bool = False
+    inj_mult: float = 1.0         # 부상 위험 배율 (내구성·재부상, M5b)
+    injury: dict | None = None    # 이번 경기에서 생긴 부상 (engine.injury.InjuryModel.draw)
+    return_at: int | None = None  # 경기 중 복귀 예정 플레이 번호
 
     def __hash__(self) -> int:  # dict/set 키로 쓰기 위해 id 기준
         return hash(self.id)

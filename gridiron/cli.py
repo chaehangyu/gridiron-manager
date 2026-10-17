@@ -94,7 +94,7 @@ def cmd_sim_game(args) -> None:
             sys.exit(f"{week}주차에 {team}의 남은 경기가 없습니다 (바이위크이거나 이미 치렀습니다).")
     out = _play(path, league, game, user_team, True, args.seed)
     from .season.runner import finish_week
-    notes = finish_week(path, league, game.week)
+    notes = finish_week(path, league, game.week, user_team)
     if args.pbp:
         for line in render_game(out.play_by_play, [game.home, game.away]):
             print(line)
@@ -253,6 +253,9 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--sub", help="보조 초점 (none이면 없음)")
     p.add_argument("--intensity", choices=["light", "normal", "hard"])
     p.set_defaults(func=cmd_train)
+
+    from .cli_season import add_parsers as add_season
+    add_season(sub)
 
     p = sub.add_parser("sim-season", help="남은 시즌을 한 번에 진행 (정규시즌·플레이오프)")
     p.add_argument("--save", default="saves/career.sqlite")
