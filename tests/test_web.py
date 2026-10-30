@@ -89,3 +89,33 @@ def test_depth_save_and_auto(client):
     assert r.json()["ok"]
     r = client.post("/depth/auto", data={"unit": "offense"}, follow_redirects=True)
     assert "자동 편성 완료" in r.text
+
+
+def test_coaching_pages(client):
+    for url in ("/tactics", "/gameplan", "/training", "/scout"):
+        assert client.get(url).status_code == 200, url
+    r = client.post("/tactics/preview", data={"offense.run_share": "0.6", "offense.run_style": "gap",
+                                              "defense.blitz": "2.5"})
+    assert "팀 궁합" in r.text and "노출도" in r.text
+
+
+def test_tactics_save_preset_and_validation(client):
+    r = client.post("/tactics/preset", data={"off": "west_coast", "def": "tampa2"}, follow_redirects=True)
+    assert "west_coast+tampa2" in r.text
+    r = client.post("/tactics", data={"name": "custom", "offense.run_share": "0.95"}, follow_redirects=True)
+    assert "런 비율은" in r.text                                        # 검증 오류 표시
+    r = client.post("/tactics", data={"name": "mine", "offense.run_share": "0.5", "offense.run_style": "gap",
+                                      "sit.3l|opp.pass": "0.2", "sit.3l|opp.blitz": "1.5"}, follow_redirects=True)
+    assert "저장했습니다" in r.text and 'value="0.2"' in r.text
+
+
+def test_gameplan_training_scout_save(client):
+    r = client.post("/gameplan", data={"use.defense.blitz": "1", "defense.blitz": "1.8"}, follow_redirects=True)
+    assert "적용 중" in r.text
+    r = client.post("/gameplan", data={"clear": "1"}, follow_redirects=True)
+    assert "지웠습니다" in r.text
+    r = client.post("/training", data={"main": "familiarity", "main_dom": "cov_zone", "sub": "recovery",
+                                       "intensity": "hard"}, follow_redirects=True)
+    assert "저장했습니다" in r.text and 'value="hard" selected' in r.text
+    r = client.post("/scout", data={"s0": "next_opponent", "s1": "free_agents", "s2": "pos:WR"}, follow_redirects=True)
+    assert 'value="pos:WR" selected' in r.text

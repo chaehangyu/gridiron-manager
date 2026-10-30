@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}게임플랜 · Gridiron Manager{% endblock %}
+{% block content %}
+<h1>게임플랜</h1>
+{% include "partials/flash.html" %}
+{% if not g %}<p class="mute">남은 경기가 없습니다.</p>{% else %}
+<div class="grid c2">
+<div class="card">
+  <h2>{{ g.week }}주차 상대 — {{ opp.name }} ({{ opp_rec }}){% if my_wp is not none %} · 예상 승률 {{ my_wp|pct }}{% endif %}</h2>
+  <h3 class="small mute">스카우팅 리포트 (경기 기록 기반, 항상 공개)</h3>
+  {% if rep.games %}<p>이번 시즌 {{ rep.games }}경기: 패스 비율 {{ rep.pass_rate|pct }}, 기대 대비 패스(PROE) {{ '%+.1f%%'|format(rep.proe * 100) }}</p>{% endif %}
+  {% if last %}<p class="small">지난 시즌 공격: PROE {{ '%+.1f%%'|format(last.offense.proe * 100) }}, 플레이액션 {{ last.offense.pa_rate|pct }}, 스크린 {{ last.offense.screen_rate|pct }}, 딥 {{ last.offense.deep_rate|pct }}, 아웃사이드 런 {{ last.offense.outside_run|pct }}</p>
+  <p class="small">지난 시즌 수비: 블리츠 {{ last.defense.blitz_rate|pct }}, 맨 커버리지 {{ last.defense.man_rate|pct }}, {% for k, v in last.defense.coverage.items()|sort(attribute='1', reverse=true) %}{{ k }} {{ v|pct }}{{ ', ' if not loop.last }}{% endfor %}</p>{% endif %}
+  {% if rep.blitz_rate is not none %}<p>예상 블리츠율 <b>{{ rep.blitz_rate|pct }}</b> · 커버리지 {% for k, v in rep.coverage.items()|sort(attribute='1', reverse=true) %}{{ k }} {{ v|pct }}{{ ', ' if not loop.last }}{% endfor %}</p>{% endif %}
+  <h3 class="small mute">상대 부상 리포트</h3>
+  <table class="small">{% for r in opp_inj %}<tr><td>{{ r.pos }}</td><td>{{ r.name }}</td><td><span class="pill {{ 'q' if r.status == '출전 의문' else 'out' }}">{{ r.status }}</span></td></tr>{% else %}<tr><td class="mute">없음</td></tr>{% endfor %}</table>
+  <p><a href="/roster?team={{ opp.abbr }}">상대 로스터 →</a></p>
+</div>
+<form class="card" method="post" action="/gameplan">
+  <h2>이번 주 조정 {% if active %}<span class="pill">적용 중</span>{% endif %}</h2>
+  <p class="small mute">체크한 항목만 이번 경기에 덮어씁니다. 경기가 끝나면 기본 전술로 돌아갑니다.</p>
+  {% for f in fields %}
+  <div x-data="{on: {{ 'true' if f.set else 'false' }}, v: {{ f.val if f.val is not none else 0.43 }} }" style="margin:6px 0">
+    <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="use.{{ f.path }}" value="1" x-model="on"> <span style="flex:1">{{ f.label }} <span class="mute">(기본 {{ f.base if f.base is not none else '평균' }})</span></span><b x-text="(+v).toFixed(2)"></b></label>
+    <input type="range" name="{{ f.path }}" min="{{ f.lo }}" max="{{ f.hi }}" step="{{ f.step }}" x-model="v" :disabled="!on" style="width:100%">
+  </div>{% endfor %}
+  <details><summary class="small mute">커버리지 강조 (배율, 1 = 기본)</summary>
+  <div class="row">{% for c in covers %}<label>{{ c }} <input type="number" name="cov.{{ c }}" step="0.1" min="0.2" max="4" value="1" style="width:64px"></label>{% endfor %}</div></details>
+  <div class="row" style="margin-top:10px"><button class="btn primary">이번 주 게임플랜 저장</button>
+  <button class="btn" name="clear" value="1">지우기</button></div>
+</form>
+</div>
+{% endif %}
+{% endblock %}

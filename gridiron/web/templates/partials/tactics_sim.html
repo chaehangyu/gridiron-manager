@@ -1,0 +1,4 @@
+<table style="margin-top:8px"><thead><tr><th></th><th class="num">득점</th><th class="num">실점</th><th class="num">승률</th></tr></thead>
+<tr><td>현재 전술</td><td class="num">{{ r.current.pf|f1 }}</td><td class="num">{{ r.current.pa|f1 }}</td><td class="num">{{ r.current.win|pct }}</td></tr>
+<tr><td>새 전술</td><td class="num">{{ r.new.pf|f1 }}</td><td class="num">{{ r.new.pa|f1 }}</td><td class="num">{{ r.new.win|pct }}</td></tr></table>
+<p class="small">상대 {{ opp }} · {{ r.n }}경기씩 · 득실차 변화 <b class="{{ 'w' if r.diff_margin > 0 else 'l' }}">{{ '%+.1f'|format(r.diff_margin) }}점/경기</b> <span class="mute">(숙련도 손해 포함, 잡음 ±2점 정도)</span></p>

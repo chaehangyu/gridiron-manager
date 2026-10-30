@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}스카우팅 · Gridiron Manager{% endblock %}
+{% block content %}
+<h1>스카우팅</h1>
+{% include "partials/flash.html" %}
+<div class="grid c2">
+<form class="card" method="post" action="/scout">
+  <h2>스카우트 배정 ({{ n_scouts }}명, 매주)</h2>
+  {% for i in range(n_scouts) %}
+  <p><label>스카우트 {{ i + 1 }} <select name="s{{ i }}">
+    <option value="next_opponent" {{ 'selected' if asg[i] == 'next_opponent' }}>다음 상대 (+25){% if nxt %} — {{ nxt }}{% endif %}</option>
+    <option value="free_agents" {{ 'selected' if asg[i] == 'free_agents' }}>FA 풀 상위 60명 (+25)</option>
+    {% for g in groups %}<option value="pos:{{ g }}" {{ 'selected' if asg[i] == 'pos:' ~ g }}>포지션 {{ g }} 리그 전체 (+10)</option>{% endfor %}
+  </select></label></p>{% endfor %}
+  <p class="small mute">파악도: 우리 선수 100, 다른 팀은 명성에 따라 20–40에서 시작. 경기한 상대 +20, 매주 +1. 파악도 100이면 정확한 능력치, 0이면 ±5 범위.</p>
+  <button class="btn primary">저장</button>
+</form>
+<div class="card">
+  <h2>팀별 파악도 · FA 풀 {{ fa_k|round|int }}</h2>
+  <div class="scroll" style="max-height:480px"><table>
+  {% for t in teams|sort(attribute='k', reverse=true) %}<tr class="{{ 'me' if t.next }}"><td><a href="/roster?team={{ t.abbr }}">{{ t.name }}</a>{% if t.next %} <span class="pill">다음 상대</span>{% endif %}</td>
+    <td style="width:45%"><div class="bar"><i style="width:{{ t.k }}%"></i></div></td><td class="num">{{ t.k|round|int }}</td></tr>{% endfor %}
+  </table></div>
+</div>
+</div>
+{% endblock %}

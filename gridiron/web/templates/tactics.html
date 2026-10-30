@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}전술 · Gridiron Manager{% endblock %}
+{% macro slider(name, label, val, lo, hi, step, fmt="×") %}
+<div style="margin:6px 0" x-data="{v: {{ val }} }"><label style="display:flex;justify-content:space-between"><span>{{ label }}</span><b x-text="'{{ fmt }}' + (+v).toFixed(2)"></b></label>
+<input type="range" name="{{ name }}" min="{{ lo }}" max="{{ hi }}" step="{{ step }}" x-model="v" style="width:100%"></div>
+{% endmacro %}
+{% block content %}
+<div class="row"><h1 style="margin:0">전술 — {{ t.name }}</h1>
+<form method="post" action="/tactics/preset" class="right row">
+  <select name="off">{% for k, v in presets_off.items() %}<option value="{{ k }}" title="{{ v[0] }}">공격: {{ k }}</option>{% endfor %}</select>
+  <select name="def">{% for k, v in presets_def.items() %}<option value="{{ k }}" title="{{ v[0] }}">수비: {{ k }}</option>{% endfor %}</select>
+  <button class="btn" onclick="return confirm('프리셋으로 공격·수비 철학을 바꿉니다.')">프리셋 적용</button></form></div>
+<p class="mute small">값은 리그 평균 대비 배율입니다 (1.0 = 리그 평균). 바꾸면 오른쪽에 궁합·노출도가 바로 계산됩니다. 저장해야 다음 경기에 적용됩니다.</p>
+{% include "partials/flash.html" %}
+<form method="post" action="/tactics" id="tform" hx-post="/tactics/preview" hx-trigger="change delay:250ms, input delay:400ms from:input[type=range]" hx-target="#preview" hx-swap="innerHTML">
+<input type="hidden" name="name" value="{{ t.name }}">
+<div class="grid c3">
+<div class="card">
+  <h2>공격 철학</h2>
+  <div x-data="{avg: {{ 'true' if t.offense.run_share is none else 'false' }} }">
+    <label><input type="checkbox" name="offense.run_share_avg" value="1" x-model="avg"> 런 비율 리그 평균</label>
+    <div x-show="!avg">{{ slider("offense.run_share", "런 비율", t.offense.run_share if t.offense.run_share is not none else 0.43, 0.2, 0.8, 0.01, "") }}</div>
+  </div>
+  <p><label>러닝 스타일 <select name="offense.run_style">{% for k, v in run_styles.items() %}<option value="{{ k }}" {{ 'selected' if t.offense.run_style == k }}>{{ v }}</option>{% endfor %}</select></label></p>
+  {{ slider("offense.short", "숏 패스", t.offense.short, 0.3, 2.5, 0.05) }}
+  {{ slider("offense.mid", "미들 패스", t.offense.mid, 0.3, 2.5, 0.05) }}
+  {{ slider("offense.deep", "딥 패스", t.offense.deep, 0.3, 2.5, 0.05) }}
+  {{ slider("offense.play_action", "플레이액션 (Play-Action)", t.offense.play_action, 0.3, 2.5, 0.05) }}
+  {{ slider("offense.screen", "스크린", t.offense.screen, 0.3, 2.5, 0.05) }}
+  {{ slider("offense.qb_style", "QB 성향 (−안전 / +공격적)", t.offense.qb_style, -1, 1, 0.05, "") }}
+  <p><label>템포 <select name="offense.tempo">{% for k, v in [("slow","느리게"),("normal","보통"),("no_huddle","노허들")] %}<option value="{{ k }}" {{ 'selected' if t.offense.tempo == k }}>{{ v }}</option>{% endfor %}</select></label></p>
+  <details><summary class="small mute">퍼스넬 배율 (Personnel)</summary>
+  {% for p in personnel %}{{ slider("offense.personnel." ~ p, p ~ " 퍼스넬", t.offense.personnel.get(p, 1.0), 0.2, 4, 0.1) }}{% endfor %}</details>
+</div>
+<div class="card">
+  <h2>수비 철학 (프론트 {{ ctx.team.front.value }})</h2>
+  {% for c in covers %}{{ slider("defense.coverage." ~ c, "커버리지 " ~ {'C0':'Cover 0','C1':'Cover 1','2M':'2-Man','C2':'Cover 2','C3':'Cover 3','QTR':'Quarters'}[c], t.defense.coverage.get(c, 1.0), 0.2, 4, 0.1) }}{% endfor %}
+  {{ slider("defense.man_zone", "맨(+) / 존(−)", t.defense.man_zone, -1, 1, 0.05, "") }}
+  {{ slider("defense.blitz", "블리츠", t.defense.blitz, 0.3, 3, 0.05) }}
+  {{ slider("defense.box", "박스 무게 (−가볍게 / +무겁게)", t.defense.box, -1, 1, 0.05, "") }}
+  <p><label>프레스 <select name="defense.press">{% for k in press %}<option value="{{ k }}" {{ 'selected' if t.defense.press == k }}>{{ {'low':'낮음','normal':'보통','high':'높음'}[k] }}</option>{% endfor %}</select></label></p>
+</div>
+<div>
+  <div class="card">
+    <h2>예측 가능성 · 경기 운영</h2>
+    {{ slider("predictability.lam", "상대 대응 강도 (경기 중 학습 반영)", t.predictability.lam, 0, 0.7, 0.05, "") }}
+    <p><label>성향 깨기 <select name="predictability.tendency_break">{% for k in breaks %}<option value="{{ k }}" {{ 'selected' if t.predictability.tendency_break == k }}>{{ {'off':'안 함','normal':'보통','aggressive':'적극적'}[k] }}</option>{% endfor %}</select></label>
+    <label><input type="checkbox" name="predictability.personnel_mix" value="1" {{ 'checked' if t.predictability.personnel_mix }}> 퍼스넬 섞기</label></p>
+    <p><label>4th down <select name="management.fourth_down">{% for k in fourth %}<option value="{{ k }}" {{ 'selected' if t.management.fourth_down == k }}>{{ {'conservative':'보수적','standard':'표준 (nfl4th)','aggressive':'공격적'}[k] }}</option>{% endfor %}</select></label>
+    <label>2점 전환 <select name="management.two_point">{% for k in twopt %}<option value="{{ k }}" {{ 'selected' if t.management.two_point == k }}>{{ {'never':'안 함','chart':'차트','aggressive':'공격적'}[k] }}</option>{% endfor %}</select></label></p>
+    <p><label>부상 위험 정책 <select name="management.injury_risk">{% for k, v in [("conservative","보수적"),("standard","표준"),("aggressive","공격적")] %}<option value="{{ k }}" {{ 'selected' if t.management.injury_risk == k }}>{{ v }}</option>{% endfor %}</select></label></p>
+    <button class="btn primary">💾 전술 저장</button>
+  </div>
+  <div id="preview" style="margin-top:14px">{% include "partials/tactics_preview.html" %}</div>
+  <div class="card" style="margin-top:14px">
+    <h2>예상 효과 (엔진)</h2>
+    <p class="small mute">다음 상대와 같은 시드로 16경기씩 돌려 현재 전술과 이 화면의 전술을 비교합니다 (약 5초).</p>
+    <button class="btn" hx-post="/tactics/simulate" hx-include="#tform" hx-target="#sim" hx-indicator="#simind">▶ 비교 시뮬</button> <span id="simind" class="htmx-indicator small mute">계산 중…</span>
+    <div id="sim"></div>
+  </div>
+</div>
+</div>
+<div class="card" style="margin-top:14px">
+  <h2>상황별 성향 (F4-3) — 패스 비율 가감(−0.5…+0.5) / 블리츠 배율</h2>
+  <div class="scroll"><table>
+  <thead><tr><th></th>{% for f in field %}<th>{{ field_ko[f] }}</th>{% endfor %}</tr></thead>
+  {% for d in dd %}<tr><th>{{ dd_ko[d] }}</th>{% for f in field %}{% set v = t.situational.get(d ~ '|' ~ f, {}) %}
+    <td style="background:{{ 'rgba(61,157,242,%.2f)'|format((v.get('pass', 0)|abs) * 1.2) if v.get('pass', 0) > 0 else 'rgba(224,82,82,%.2f)'|format((v.get('pass', 0)|abs) * 1.2) }}">
+      <input name="sit.{{ d }}|{{ f }}.pass" type="number" step="0.05" min="-0.5" max="0.5" value="{{ v.get('pass', 0) }}" style="width:62px" title="패스 비율 가감">
+      <input name="sit.{{ d }}|{{ f }}.blitz" type="number" step="0.1" min="0.2" max="4" value="{{ v.get('blitz', 1) }}" style="width:56px" title="블리츠 배율"></td>{% endfor %}</tr>{% endfor %}
+  </table></div>
+</div>
+</form>
+<div class="card" style="margin-top:14px">
+  <h2>전술 숙련도 (주간 훈련으로 올림)</h2>
+  <div class="grid c3">{% for lab, v in fam %}<div><div class="row small"><span>{{ lab }}</span><b class="right">{{ v|round|int }}</b></div><div class="bar"><i style="width:{{ v }}%;background:{{ 'var(--win)' if v >= 80 else 'var(--warn)' if v >= 60 else 'var(--loss)' }}"></i></div></div>{% endfor %}</div>
+</div>
+{% endblock %}

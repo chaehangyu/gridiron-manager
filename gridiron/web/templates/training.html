@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}주간 훈련 · Gridiron Manager{% endblock %}
+{% block content %}
+<h1>주간 훈련</h1>
+{% include "partials/flash.html" %}
+<div class="grid c2">
+<form class="card" method="post" action="/training" x-data="{main:'{{ tp.main.split(':')[0] }}', sub:'{{ (tp.sub or 'none').split(':')[0] }}'}">
+  <h2>이번 주 계획 (다음 주 시작 때 적용)</h2>
+  <p><label>주 초점 <select name="main" x-model="main">{% for k, v in focuses.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></label>
+     <select name="main_dom" x-show="main=='familiarity'"><option value="auto">자동 (코치 권고: 가장 낮은 영역)</option>{% for d in domains %}<option value="{{ d }}" {{ 'selected' if tp.main == 'familiarity:' ~ d }}>{{ dlabels[d] }}</option>{% endfor %}</select></p>
+  <p><label>보조 초점 (효과 절반) <select name="sub" x-model="sub"><option value="none">없음</option>{% for k, v in focuses.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></label>
+     <select name="sub_dom" x-show="sub=='familiarity'"><option value="auto">자동</option>{% for d in domains %}<option value="{{ d }}" {{ 'selected' if tp.sub == 'familiarity:' ~ d }}>{{ dlabels[d] }}</option>{% endfor %}</select></p>
+  <p><label>강도 <select name="intensity">{% for k, (m, c) in intensity.items() %}<option value="{{ k }}" {{ 'selected' if tp.intensity == k }}>{{ {'light':'가볍게','normal':'보통','hard':'강하게'}[k] }} — 효과 ×{{ m }}, 컨디션 {{ '%+g'|format(c) }}</option>{% endfor %}</select></label></p>
+  <ul class="small mute">
+    <li>전술 숙련: 선택 영역 +5, 나머지 +1.5 (×강도). 지금 전술이 쓰는 영역: {% for d in used %}{{ dlabels[d] }}{{ ', ' if not loop.last }}{% endfor %}</li>
+    <li>상대 분석: 경기 중 상대 성향을 더 빨리 읽고 스카우팅 사전 정보가 늘어남</li>
+    <li>레드존·3rd down·2분 드릴·특수팀: 그 상황 결과에 소폭 보너스 · 회복: 컨디션 +10</li>
+    <li>강하게 훈련하면 컨디션이 떨어지고 경기 중 부상 위험이 커집니다 (피로).</li>
+  </ul>
+  <button class="btn primary">저장</button>
+</form>
+<div class="card">
+  <h2>전술 숙련도</h2>
+  {% for d, lab, v in fam %}<div style="margin:4px 0"><div class="row small"><span>{{ lab }}{% if d in used %} <span class="pill">사용 중</span>{% endif %}</span><b class="right">{{ v|round(1) }}</b></div><div class="bar"><i style="width:{{ v }}%;background:{{ 'var(--win)' if v >= 80 else 'var(--warn)' if v >= 60 else 'var(--loss)' }}"></i></div></div>{% endfor %}
+</div>
+<div class="card">
+  <h2>컨디션 — 평균 {{ avg|round(1) }}</h2>
+  <table class="small">{% for p in low %}<tr><td>{{ p.position.value }}</td><td><a href="/player/{{ p.id }}">{{ p.name }}</a></td><td class="num warn">{{ p.condition|round|int }}</td></tr>{% else %}<tr><td class="mute">컨디션 85 미만 선수 없음</td></tr>{% endfor %}</table>
+</div>
+<div class="card">
+  <h2>부상 선수 훈련 참여</h2>
+  <table class="small">{% for p in injured %}<tr><td>{{ p.position.value }}</td><td>{{ p.name }}</td><td>{{ {'dnp':'불참','limited':'제한','full':'완전'}[p.injury.practice] }}</td></tr>{% else %}<tr><td class="mute">없음</td></tr>{% endfor %}</table>
+  <p class="small mute">훈련 참여는 의료진 권고가 자동 적용됩니다. 출전 결정은 <a href="/injuries">부상 관리</a>에서.</p>
+</div>
+</div>
+{% endblock %}
