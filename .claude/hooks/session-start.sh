@@ -5,4 +5,4 @@ if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
   exit 0
 fi
 cd "${CLAUDE_PROJECT_DIR:-$(dirname "$0")/../..}"
-pip install -q -e ".[dev,web]" 2>&1 | grep -v "Running pip as the 'root' user" || true
+python -m pip install -q -e ".[dev,web]" 2>&1 | grep -v "Running pip as the 'root' user" || true

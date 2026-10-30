@@ -193,6 +193,16 @@ def cmd_standings(args) -> None:
     _print_standings(league, user_team)
 
 
+def cmd_serve(args) -> None:
+    import os
+
+    import uvicorn
+    if args.saves:
+        os.environ["GRIDIRON_SAVES"] = args.saves
+    print(f"Gridiron Manager — http://{args.host}:{args.port}")
+    uvicorn.run("gridiron.web.app:app", host=args.host, port=args.port)
+
+
 def cmd_quick(args) -> None:
     from .engine.api import simulate
     from .engine.commentary import render_game
@@ -264,6 +274,12 @@ def main(argv: list[str] | None = None) -> None:
 
     from .cli_season import add_parsers as add_season
     add_season(sub)
+
+    p = sub.add_parser("serve", help="웹 UI 실행 (http://127.0.0.1:8000)")
+    p.add_argument("--host", default="127.0.0.1")
+    p.add_argument("--port", type=int, default=8000)
+    p.add_argument("--saves", help="세이브 폴더 (기본 saves/)")
+    p.set_defaults(func=cmd_serve)
 
     p = sub.add_parser("sim-season", help="남은 시즌을 한 번에 진행 (정규시즌·플레이오프)")
     p.add_argument("--save", default="saves/career.sqlite")

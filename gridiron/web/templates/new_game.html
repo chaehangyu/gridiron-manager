@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}새 게임 · Gridiron Manager{% endblock %}
+{% block content %}
+<h1>새 게임 / 불러오기</h1>
+<div class="grid c2">
+<div class="card">
+  <h2>새 커리어</h2>
+  <form method="post" action="/new" x-data="{team:'KC'}">
+    <p class="mute small">2026 실제 로스터·일정으로 시작합니다. 단장 겸 감독으로 팀을 맡습니다.</p>
+    <div class="grid c2" style="gap:6px">
+    {% for div, teams in divisions %}
+      <div><div class="mute small">{{ div }}</div>
+      {% for t in teams %}
+        <label style="display:block;color:var(--text);font-size:13px;cursor:pointer">
+          <input type="radio" name="team" value="{{ t.abbr }}" x-model="team" {% if t.abbr == 'KC' %}checked{% endif %}>
+          <span class="swatch" style="background:{{ t.color }}"></span> {{ t.name }}</label>
+      {% endfor %}</div>
+    {% endfor %}
+    </div>
+    <div class="row" style="margin-top:12px">
+      <label>슬롯 이름 <input name="slot" :value="'career_' + team.toLowerCase()" required pattern="[\w\-가-힣]{1,40}"></label>
+      <label>데이터 <select name="source"><option value="real">2026 실제 NFL</option><option value="sample">가상 샘플 리그</option></select></label>
+      <button class="btn primary">시작</button>
+    </div>
+    <p class="mute small">시작할 때 구단주가 시즌 기대치를 계산합니다 (엔진으로 약 1분).</p>
+  </form>
+</div>
+<div class="card">
+  <h2>저장 슬롯</h2>
+  {% if not slots %}<p class="mute">저장된 게임이 없습니다.</p>{% endif %}
+  <table>
+  {% for s in slots %}
+    <tr><td><b>{{ s.name }}</b></td>
+    {% if s.ok %}<td>{{ s.team }}</td><td class="mute">{{ s.season }} · {{ s.week }}주 · {{ s.phase }}</td>
+      <td><form method="post" action="/load/{{ s.name }}"><button class="btn sm primary">불러오기</button></form></td>
+    {% else %}<td colspan="3" class="warn">다른 버전 세이브 (열 수 없음)</td>{% endif %}
+      <td><form method="post" action="/delete/{{ s.name }}" onsubmit="return confirm('{{ s.name }} 슬롯을 삭제할까요?')"><button class="btn sm danger">삭제</button></form></td></tr>
+  {% endfor %}
+  </table>
+</div>
+</div>
+{% endblock %}

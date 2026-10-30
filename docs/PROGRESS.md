@@ -35,7 +35,8 @@
 - 엔진 경기 1회 약 0.1초, 한 주 16경기 약 2초, 새 게임 구단주 투영 약 1분 → 긴 작업은 HTMX 진행 표시(폴링 또는 단계별 요청).
 
 하위 단계 (각각 커밋·푸시·이 파일 갱신)
-- [ ] **M6a 기반** — `gridiron/web/`(app.py, templates/base.html 레이아웃·내비, static/), S1 새 게임/불러오기(팀 선택, 슬롯), S2 홈(다음 경기, 이번 주 할 일, 구단주 인박스, 부상 요약, "경기 진행"·"주 진행" 버튼), `gridiron serve` 명령, TestClient 테스트.
+- [x] **M6a 기반** — `gridiron/web/`: `app.py`(앱·필터·`render`·`need_ctx`), `state.py`(슬롯=saves/*.sqlite, 쿠키 `slot`, 수정 시각 캐시, `LOCK`), `jobs.py`(백그라운드 작업 + HTMX 폴링 `/jobs/{id}`), `views.py`(화면용 데이터), `routes/core.py`(S1 `/new`, S2 `/home`, 진행 `/play/{game|week|regular|end}`, S12 `/settings`). 프런트 라이브러리는 `static/vendor/`에 포함(htmx 2.0.4, Alpine 3.14.8, Sortable 1.15.6, Chart.js 4.4.7 — 컨테이너에서 CDN 차단, npm pack으로 받음). 인박스는 새 `NewsRow`(runner가 경기 결과·부상·로스터·구단주 알림 기록). `gridiron serve`. 테스트 `tests/test_web.py`.
+  - 스크린샷: `python -m pip install playwright` 후 크로미움 `/opt/pw-browsers/chromium-*/chrome-linux64/chrome`로 확인.
 - [ ] **M6b 선수단** — S3 로스터(53/PS/IR 탭, 정렬·필터, FA 영입·방출·승격·임시 승격), S4 선수 프로필(능력치 등급 색상, 파악도 범위, PR·별점, 역할, 부상 이력, 기록), S5 뎁스차트(SortableJS 드래그, 공/수/특수 탭, 유효성 경고 F3-7, 자동 편성 버튼 F3-6), S13 부상 관리.
 - [ ] **M6c 전술·주간** — S6 전술(프리셋, 슬라이더, 상황별 성향 히트맵, 궁합·숙련도 미리보기, 예상 EPA 미리보기 F4-8d, 노출도 게이지 F5-7c), S7 게임플랜, S14 주간 훈련, S16 스카우팅.
 - [ ] **M6d 경기·리그** — S8 매치 센터(텍스트 중계 스트림, 스코어보드, 필드 바, 승률 그래프, 속도: 즉시/하이라이트/전체 F6-1), S9 경기 결과(박스스코어, 드라이브 차트 F6-4, 전술 리포트), S10 일정·순위·플레이오프 대진, S11 리그 통계·리더보드(F7-4), S15 구단주(신뢰도 그래프), S12 설정(해고 끄기, 시뮬 속도). 마지막에 브라우저로 시즌 1회 완주 확인.

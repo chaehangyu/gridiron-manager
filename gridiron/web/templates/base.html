@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{% block title %}Gridiron Manager{% endblock %}</title>
+<link rel="stylesheet" href="/static/app.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏈</text></svg>">
+<script src="/static/vendor/htmx.min.js"></script>
+<script defer src="/static/vendor/alpine.min.js"></script>
+{% block head %}{% endblock %}
+</head>
+<body>
+<div class="layout">
+<nav class="side">
+  <div class="brand">🏈 Gridiron Manager</div>
+  {% if ctx and ctx.user %}
+  {% set items = [("홈","/home"),("일정·순위","/standings"),("리그 통계","/stats")] %}
+  {% for label, href in items %}<a href="{{ href }}" class="{{ 'on' if nav.startswith(href) }}">{{ label }}</a>{% endfor %}
+  <div class="grp">선수단</div>
+  {% for label, href in [("로스터","/roster"),("뎁스차트","/depth"),("부상 관리","/injuries"),("스카우팅","/scout")] %}<a href="{{ href }}" class="{{ 'on' if nav.startswith(href) }}">{{ label }}</a>{% endfor %}
+  <div class="grp">코칭</div>
+  {% for label, href in [("전술","/tactics"),("게임플랜","/gameplan"),("주간 훈련","/training")] %}<a href="{{ href }}" class="{{ 'on' if nav.startswith(href) }}">{{ label }}</a>{% endfor %}
+  <div class="grp">구단</div>
+  {% for label, href in [("구단주","/owner"),("설정","/settings"),("저장 슬롯","/new")] %}<a href="{{ href }}" class="{{ 'on' if nav.startswith(href) }}">{{ label }}</a>{% endfor %}
+  {% else %}
+  <a href="/new" class="on">새 게임 / 불러오기</a>
+  {% endif %}
+</nav>
+<main>
+  {% if ctx and ctx.user %}
+  <div class="topbar">
+    <div class="teamchip"><span class="swatch" style="background:{{ ctx.team.color }}"></span>
+      <b>{{ ctx.team.name }}</b> <span class="mute">{{ top_record }}</span></div>
+    <div class="meta">{{ top_week }} · 슬롯 {{ ctx.name }}</div>
+    {% if job %}<a class="pill" href="/jobs/{{ job.id }}">⏳ {{ job.title }} 진행 중</a>{% endif %}
+  </div>
+  {% endif %}
+  {% block content %}{% endblock %}
+</main>
+</div>
+{% block scripts %}{% endblock %}
+</body>
+</html>

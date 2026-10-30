@@ -24,6 +24,9 @@ gridiron = "gridiron.cli:main"
 [tool.setuptools.packages.find]
 include = ["gridiron*"]
 
+[tool.setuptools.package-data]
+gridiron = ["web/templates/**/*", "web/static/**/*"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"

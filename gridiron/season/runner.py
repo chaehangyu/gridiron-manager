@@ -28,6 +28,8 @@ def play_game(path: Path, league: League, game: ScheduledGame, user_team: str | 
     start_week(path, league, game.week, user_team)
     out = simulate(league, game, seed=seed if seed is not None else seed_for(game), play_by_play=pbp,
                    user_team=user_team)
+    if pbp and out.wp_series:   # 매치 센터 승률 그래프용 (플레이 로그 끝에 함께 저장)
+        out.box["plays"].append({"type": "wpSeries", "series": [list(x) for x in out.wp_series]})
     record_game(path, game, {"overtimes": out.overtimes}, out.seed, out.box, tactics=out.tactics)
     after_game(league, out.tactics, out.box["players"])
     injuries.apply_game(league, game, out.injuries)
@@ -36,7 +38,22 @@ def play_game(path: Path, league: League, game: ScheduledGame, user_team: str | 
         from ..db.store import save_owner
         owner.after_game(league.owner, league, game)
         save_owner(path, league)
+    if user_team in (game.home, game.away):
+        from ..db.store import add_news
+        add_news(path, league.season, game.week, [("result", result_text(league, game, user_team))]
+                 + [("injury", f"{league.players[i['pid']].name}({league.players[i['pid']].position.value}) "
+                               f"{i['label']}") for i in out.injuries if i["team"] == user_team])
     return out
+
+
+def result_text(league: League, game: ScheduledGame, team: str) -> str:
+    mine = game.home_score if game.home == team else game.away_score
+    theirs = game.away_score if game.home == team else game.home_score
+    opp = game.away if game.home == team else game.home
+    wl = "승" if mine > theirs else "패" if mine < theirs else "무"
+    where = "vs" if game.home == team else "@"
+    label = "" if game.game_type == "REG" else f"{ROUND_LABEL[game.game_type]} "
+    return f"{label}{wl} {mine}–{theirs} {where} {league.teams[opp].name}"
 
 
 def ensure_owner(path: Path, league: League, user_team: str | None) -> list[str]:
@@ -118,12 +135,23 @@ def finish_week(path: Path, league: League, week: int, user_team: str | None = N
             notes.append("⚠ 해고되었습니다. 샌드박스로 계속 진행할 수 있습니다 (gridiron owner --firing off).")
         from ..db.store import save_owner
         save_owner(path, league)
+    if user_team:
+        from ..db.store import add_news
+        add_news(path, league.season, week, [(_kind(n), n) for n in notes])
     league.week = week + 1 if league.phase != "offseason" else week
     injuries.weekly_report(league, league.week)          # 다음 주 공식 부상 리포트
     set_progress(path, week=league.week, phase=league.phase)
     from ..db.store import save_team_state
     save_team_state(path, league)
     return notes
+
+
+def _kind(note: str) -> str:
+    if note.startswith("구단주"):
+        return "owner"
+    if "IR" in note or "영입" in note or "방출" in note or "승격" in note or "강등" in note or "53인" in note:
+        return "roster"
+    return "league"
 
 
 def sim_week(path: Path, league: League, user_team: str | None,

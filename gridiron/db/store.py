@@ -425,3 +425,23 @@ def _load_knowledge(s: Session, league: League, team: str | None) -> None:
                                                      & (S.ScoutAssignmentRow.season == league.season))
                   .order_by(S.ScoutAssignmentRow.scout_no))
     league.scout_assignments = [r.target_type + (f":{r.target}" if r.target else "") for r in rows]
+
+
+def add_news(path: Path, season: int, week: int, items: list[tuple[str, str]]) -> None:
+    """인박스 알림 추가 [(종류, 문장)]."""
+    if not items:
+        return
+    eng = engine_for(path)
+    S.NewsRow.__table__.create(eng, checkfirst=True)
+    with Session(eng) as s:
+        for kind, text in items:
+            s.add(S.NewsRow(season=season, week=week, kind=kind, text=text))
+        s.commit()
+
+
+def news(path: Path, season: int, limit: int = 50) -> list[S.NewsRow]:
+    eng = engine_for(path)
+    S.NewsRow.__table__.create(eng, checkfirst=True)
+    with Session(eng) as s:
+        return list(s.exec(select(S.NewsRow).where(S.NewsRow.season == season)
+                           .order_by(S.NewsRow.id.desc()).limit(limit)))

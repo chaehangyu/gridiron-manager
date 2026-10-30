@@ -306,3 +306,13 @@ class OpponentModelRow(SQLModel, table=True):
     observer_team: str = Field(primary_key=True)
     bucket: str = Field(primary_key=True)
     family_counts: dict = JsonField(default_factory=dict)
+
+
+class NewsRow(SQLModel, table=True):
+    """인박스 알림 (PRD F7-8): 경기 결과, 부상·로스터 이동, 플레이오프, 구단주 메시지 등. M6에서 추가 (기존 세이브는 처음 쓸 때 생성)."""
+    __tablename__ = "news"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    season: int = Field(index=True)
+    week: int
+    kind: str                              # result | injury | roster | league | owner | info
+    text: str

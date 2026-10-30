@@ -1,0 +1,6 @@
+<div class="bar" style="margin-bottom:8px"><i style="width:{{ (j.progress * 100)|round }}%"></i></div>
+{% if j.error %}<div class="err">오류: {{ j.error }}</div>{% endif %}
+<div class="joblog" id="joblog">{% for l in j.lines[-200:] %}{{ l }}
+{% endfor %}</div>
+{% if j.done %}<p><a class="btn primary" href="{{ j.redirect }}">계속</a></p>{% else %}<p class="mute small">진행 중…</p>{% endif %}
+<script>var e=document.getElementById('joblog'); if(e) e.scrollTop=e.scrollHeight;</script>

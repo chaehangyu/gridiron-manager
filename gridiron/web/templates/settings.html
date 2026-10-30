@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>설정</h1>
+{% if request.query_params.get('saved') %}<div class="flash">저장했습니다.</div>{% endif %}
+<form method="post" action="/settings" class="card" style="max-width:640px">
+  <h2>게임</h2>
+  <p><label>구단주 해고 <select name="firing"><option value="on" {{ 'selected' if not ctx.league.owner or ctx.league.owner.firing }}>켜기</option><option value="off" {{ 'selected' if ctx.league.owner and not ctx.league.owner.firing }}>끄기 (샌드박스)</option></select></label></p>
+  <p><label>로스터 자동 관리 (대체 영입·임시 승격·IR) <select name="auto_roster"><option value="on" {{ 'selected' if ctx.team.auto_roster }}>켜기 (스태프 권고 자동 적용)</option><option value="off" {{ 'selected' if not ctx.team.auto_roster }}>끄기 (직접)</option></select></label></p>
+  <p><label>부상 위험 정책 (경기 중 복귀 판정) <select name="injury_risk">
+    {% for k, v in [("conservative","보수적"),("standard","표준"),("aggressive","공격적")] %}<option value="{{ k }}" {{ 'selected' if ctx.team.tactics.management.injury_risk == k }}>{{ v }}</option>{% endfor %}</select></label></p>
+  <button class="btn primary">저장</button>
+</form>
+<div class="card" style="max-width:640px;margin-top:14px">
+  <h2>리그 규칙 (config/league_rules.yaml)</h2>
+  <p class="small mute">53인 {{ rules.roster.active_max }} · 경기 당일 {{ rules.roster.gameday_active }} · 연습 스쿼드 {{ rules.roster.practice_squad }} · IR 최소 {{ rules.ir.min_games }}경기 · 복귀 지정 {{ rules.ir.return_designations }}회 · 정규시즌 연장 {{ rules.game.overtime_length }}분</p>
+</div>
+{% endblock %}

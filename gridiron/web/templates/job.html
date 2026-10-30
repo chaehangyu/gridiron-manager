@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h2>{{ j.title }}</h2>
+  <div id="job" hx-get="/jobs/{{ j.id }}" hx-trigger="load, every 800ms" hx-swap="innerHTML">{% include "partials/job.html" %}</div>
+  <noscript><meta http-equiv="refresh" content="2"></noscript>
+</div>
+{% endblock %}
