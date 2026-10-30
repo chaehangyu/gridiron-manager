@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}{{ prof.p.name }} · Gridiron Manager{% endblock %}
+{% block content %}
+{% set p = prof.p %}
+<div class="row"><div>
+  <h1 style="margin:0">{{ p.name }} <span class="mute small">#{{ p.jersey or '' }}</span></h1>
+  <div class="mute">{{ p.position.value }} · {{ team.name if team else 'FA' }} ({{ p.roster_status.value }}) · {{ prof.age|round(1) }}세 · {{ p.height_in or '?' }}in {{ p.weight_lb or '?' }}lb · 경력 {{ p.years_exp }}년{% if p.college %} · {{ p.college }}{% endif %}</div>
+</div>
+<div class="right" style="text-align:right">
+  <div><span class="r {{ ((prof.pr_lo + prof.pr_hi) / 2)|grade }}" style="font-size:20px;padding:2px 8px">{{ prof.pr }}</span> <span class="stars" style="font-size:18px">{{ prof.stars }}</span></div>
+  <div class="small mute">파악도 {{ prof.knowledge|round|int }}/100 · 컨디션 {{ p.condition|round|int }}</div>
+</div></div>
+{% if p.injury %}<div class="err" style="margin-top:10px">부상: {{ p.injury.type }} — 예상 {{ '시즌 아웃' if p.injury.weeks_out_min >= 99 else p.injury.weeks_out_min ~ '–' ~ p.injury.weeks_out_max ~ '경기' }} ({{ p.injury.status }})</div>{% endif %}
+<div class="grid c3" style="margin-top:12px">
+  <div class="card" style="grid-column:span 2">
+    <h2>능력치 {% if not prof.own %}<span class="small">— 파악도에 따른 범위 (스카우트 배정으로 좁힐 수 있음)</span>{% endif %}</h2>
+    <div class="grid c3">
+    {% for g, items in prof.groups.items() %}
+      <div><div class="mute small" style="margin-bottom:4px">{{ g }}</div>
+      <table>{% for a in items %}<tr><td>{{ a.label }}</td><td class="num"><span class="r {{ a.mid|grade }}">{{ a.lo|int if a.lo == a.hi else (a.lo|int ~ '–' ~ a.hi|int) }}</span></td></tr>{% endfor %}</table></div>
+    {% endfor %}
+    </div>
+  </div>
+  <div class="grid" style="align-content:start">
+    <div class="card"><h2>포지션별 PR</h2><table>{% for pos, v in prof.prs %}<tr><td>{{ pos }}</td><td class="num">{{ v }}</td></tr>{% endfor %}</table></div>
+    {% if prof.roles %}<div class="card"><h2>역할 평가{% if prof.role_grade %} — {{ prof.role_grade }}{% endif %}</h2><table>{% for r in prof.roles %}<tr><td>{{ r.name }}{% if r.best %} ◀{% endif %}</td><td class="num">{{ r.range }}</td></tr>{% endfor %}</table></div>{% endif %}
+    <div class="card"><h2>코치·의료진 코멘트</h2>{% if prof.hidden %}<ul class="list">{% for h in prof.hidden %}<li>{{ h }}</li>{% endfor %}</ul>{% else %}<p class="mute">다른 팀 선수의 숨김 능력치는 비공개입니다.</p>{% endif %}</div>
+    <div class="card"><h2>부상 이력</h2>{% if prof.injuries %}<table>{% for h in prof.injuries %}<tr><td>{{ h.season }} {{ h.week }}주</td><td>{{ h.type }}</td><td class="num">{{ h.missed }}경기</td></tr>{% endfor %}</table>{% else %}<p class="mute">기록 없음</p>{% endif %}</div>
+  </div>
+</div>
+<div class="card" style="margin-top:14px"><h2>{{ ctx.league.season }} 시즌 기록</h2>
+  {% if stats %}<div class="row">{% for lab, v in stats %}<div style="min-width:80px"><div class="mute small">{{ lab }}</div><b>{{ v|round|int }}</b></div>{% endfor %}</div>{% else %}<p class="mute">이번 시즌 출전 기록이 없습니다.</p>{% endif %}
+</div>
+{% endblock %}

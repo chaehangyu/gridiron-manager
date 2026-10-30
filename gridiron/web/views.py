@@ -64,3 +64,69 @@ def division_table(league: League, team: str) -> list[dict]:
         out.append({"abbr": abbr, "name": league.teams[abbr].name, "rec": r.text(), "pf": r.pf, "pa": r.pa,
                     "seed": seed_of.get(abbr), "me": abbr == team})
     return out
+
+
+def player_profile(league: League, p, observer: str | None, path) -> dict:
+    """선수 프로필 (S4): CLI `player`와 같은 계산. 다른 팀 선수는 파악도 범위."""
+    from ..domain.attributes import ATTRIBUTES, HIDDEN_KEYS, grade_label
+    from ..domain.positions import Position
+    from ..ratings.position_rating import position_rating
+    from ..ratings.roles import role_ratings
+    from ..season import knowledge as KN
+    own = p.team == observer
+    k = KN.knowledge(league, p, observer)
+    lo, hi = KN.pr_range(league, p, observer)
+    groups: dict[str, list] = {}
+    labels = {"physical": "신체", "mental": "정신", "passing": "패싱", "ball_carrier": "볼 캐리어", "receiving": "리시빙",
+              "blocking": "블로킹", "defense": "수비", "special": "스페셜팀"}
+    for d in ATTRIBUTES.values():
+        if d.key in HIDDEN_KEYS:
+            continue
+        r = KN.attr_range(league, p, d.key, observer)
+        groups.setdefault(labels.get(d.group, d.group), []).append(
+            {"label": d.label_ko, "lo": r[0], "hi": r[1], "mid": (r[0] + r[1]) / 2})
+    special = (Position.K, Position.P, Position.LS)
+    top = sorted(((pos, position_rating(p, pos)) for pos in Position if pos == p.position or pos not in special),
+                 key=lambda x: -x[1])[:4]
+    rr = role_ratings(p)
+    best = max(rr, key=lambda key: rr[key][1]) if rr else None
+    roles = [{"name": n, "range": KN.fmt_range(*KN.value_range(league, p, observer, v, "role:" + key)),
+              "best": key == best and own, "v": v} for key, (n, v) in rr.items()]
+    hidden = KN.hidden_comments(p, max(0, league.week - 1)) if own else None
+    hist = []
+    if path is not None:
+        from sqlmodel import Session, select
+
+        from ..db import schema as S
+        from ..db.store import engine_for
+        with Session(engine_for(path)) as s:
+            hist = [{"season": h.season, "week": h.week, "type": h.type, "missed": h.missed, "status": h.status}
+                    for h in s.exec(select(S.InjuryRow).where(S.InjuryRow.player_id == p.id).order_by(S.InjuryRow.id))]
+    return {"p": p, "own": own, "knowledge": k, "pr": KN.fmt_range(lo, hi), "pr_lo": lo, "pr_hi": hi,
+            "stars": KN.star_text(lo, hi), "groups": groups, "prs": [(pos.value, KN.fmt_range(*KN.pr_range(
+                league, p, observer, pos))) for pos, _ in top], "roles": roles,
+            "role_grade": grade_label(rr[best][1]) if best and own else None, "hidden": hidden, "injuries": hist,
+            "age": p.age_on(league.season_start())}
+
+
+def season_stats(path, pid: str, season: int) -> dict:
+    from sqlmodel import Session, select
+
+    from ..db import schema as S
+    from ..db.store import engine_for
+    tot: dict = {}
+    with Session(engine_for(path)) as s:
+        q = select(S.PlayerGameStatsRow, S.GameRow).where(S.PlayerGameStatsRow.player_id == pid) \
+            .where(S.GameRow.id == S.PlayerGameStatsRow.game_id).where(S.GameRow.season == season)
+        for r, _ in s.exec(q):
+            for k, v in r.stats.items():
+                if isinstance(v, (int, float)):
+                    tot[k] = tot.get(k, 0) + v
+    return tot
+
+
+STAT_LABELS = [("gp", "경기"), ("snaps", "스냅"), ("pssCmp", "완성"), ("pss", "시도"), ("pssYds", "패싱야드"),
+               ("pssTD", "패싱TD"), ("pssInt", "INT"), ("pssSk", "색 허용"), ("rus", "러싱"), ("rusYds", "러싱야드"),
+               ("rusTD", "러싱TD"), ("tgt", "타깃"), ("rec", "리셉션"), ("recYds", "리시빙야드"), ("recTD", "리시빙TD"),
+               ("defTck", "태클"), ("defSk", "색"), ("defInt", "INT"), ("defPssDef", "패스방어"), ("defFmbFrc", "강제 펌블"),
+               ("fg", "FG 성공"), ("fga", "FG 시도"), ("pnt", "펀트"), ("pntYds", "펀트야드")]

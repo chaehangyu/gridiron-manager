@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}로스터 · Gridiron Manager{% endblock %}
+{% block content %}
+<div class="row"><h1 style="margin:0">{{ ctx.league.teams[abbr].name }} 로스터</h1>
+  <form method="get" action="/roster" class="right row"><input type="hidden" name="tab" value="{{ tab if tab != 'fa' else 'active' }}">
+    <select name="team" onchange="this.form.submit()">{% for t in teams %}<option value="{{ t }}" {{ 'selected' if t == abbr }}>{{ t }}{{ ' (우리 팀)' if t == ctx.user }}</option>{% endfor %}</select></form></div>
+<p class="mute">53인 {{ counts.active }}/{{ lim.active_max }} · 연습 스쿼드 {{ counts.ps }}/{{ lim.practice_squad }} · IR {{ counts.ir }} · 경기 당일 활성 {{ counts.gameday }}/{{ lim.gameday_active }}
+  {% if own %} · 자동 관리 {{ '켜짐' if ctx.team.auto_roster else '꺼짐' }} (<a href="/settings">설정</a>){% else %} · 다른 팀 선수 능력은 파악도에 따른 범위{% endif %}</p>
+{% include "partials/flash.html" %}
+<div class="tabs">{% for k, v in tabs.items() %}{% if own or k != 'fa' %}<a href="/roster?tab={{ k }}{{ '&team=' ~ abbr if not own }}" class="{{ 'on' if tab == k }}">{{ v }}</a>{% endif %}{% endfor %}</div>
+<form method="get" action="/roster" class="row" style="margin-bottom:8px">
+  <input type="hidden" name="tab" value="{{ tab }}">{% if not own %}<input type="hidden" name="team" value="{{ abbr }}">{% endif %}
+  <label>포지션 <select name="pos" onchange="this.form.submit()"><option value="">전체</option>{% for g in groups %}<option {{ 'selected' if g == pos }}>{{ g }}</option>{% endfor %}</select></label>
+  <label>정렬 <select name="sort" onchange="this.form.submit()">{% for k, v in [("pr","PR"),("pos","포지션"),("age","나이"),("cond","컨디션"),("name","이름")] %}<option value="{{ k }}" {{ 'selected' if k == sort }}>{{ v }}</option>{% endfor %}</select></label>
+</form>
+<div class="card scroll">
+<table>
+<thead><tr><th>포지션</th><th>이름</th><th class="num">나이</th><th class="num">경력</th><th class="num">PR</th><th>별점</th>{% if own %}<th>역할</th>{% endif %}<th class="num">컨디션</th><th>부상</th>{% if tab == 'fa' or not own %}<th class="num">파악도</th>{% endif %}<th></th></tr></thead>
+<tbody>
+{% set back = request.url.path ~ '?' ~ request.url.query %}
+{% for r in rows %}
+<tr><td>{{ r.pos }}</td><td><a href="/player/{{ r.id }}">{{ r.name }}</a>{% if tab == 'active' and not r.gameday and not r.inj %} <span class="pill" title="경기 당일 비활성">비활성</span>{% endif %}</td>
+<td class="num">{{ r.age|round(1) }}</td><td class="num">{{ r.exp }}</td>
+<td class="num"><span class="r {{ r.pr|grade }}">{{ r.pr_txt }}</span></td><td class="stars">{{ r.stars }}</td>
+{% if own %}<td class="small">{{ r.role }}</td>{% endif %}
+<td class="num {{ 'warn' if r.cond < 85 }}">{{ r.cond|round|int }}</td>
+<td>{% if r.inj %}<span class="pill {{ 'q' if r.inj_status == '출전 의문' else 'out' }}">{{ r.inj_status }}</span> <span class="small mute">{{ r.inj }}</span>{% endif %}</td>
+{% if tab == 'fa' or not own %}<td class="num mute">{{ r.knowledge|round|int }}</td>{% endif %}
+<td class="row" style="gap:4px;flex-wrap:nowrap">
+{% if tab == 'fa' %}
+  <form method="post" action="/roster/sign/{{ r.id }}"><input type="hidden" name="back" value="{{ back }}"><button class="btn sm primary">영입</button></form>
+  <form method="post" action="/roster/sign_ps/{{ r.id }}"><input type="hidden" name="back" value="{{ back }}"><button class="btn sm">PS 영입</button></form>
+{% elif own and tab == 'active' %}
+  <form method="post" action="/roster/{{ 'activate_gameday' if r.id in ctx.team.inactives else 'inactive' }}/{{ r.id }}"><input type="hidden" name="back" value="{{ back }}"><button class="btn sm" title="경기 당일 비활성 지정">{{ '활성화' if r.id in ctx.team.inactives else '비활성' }}</button></form>
+  <form method="post" action="/roster/demote/{{ r.id }}"><input type="hidden" name="back" value="{{ back }}"><button class="btn sm">PS 강등</button></form>
+  <form method="post" action="/roster/release/{{ r.id }}" onsubmit="return confirm('{{ r.name }} 방출?')"><input type="hidden" name="back" value="{{ back }}"><button class="btn sm danger">방출</button></form>
+{% elif own and tab == 'ps' %}
+  <form method="post" action="/roster/promote/{{ r.id }}"><input type="hidden" name="back" value="{{ back }}"><button class="btn sm">53인 승격</button></form>
+  <form method="post" action="/roster/elevate/{{ r.id }}"><input type="hidden" name="back" value="{{ back }}"><button class="btn sm" title="이번 경기 임시 승격 (시즌 {{ r.elev }}/3회)">임시 승격</button></form>
+  <form method="post" action="/roster/release/{{ r.id }}"><input type="hidden" name="back" value="{{ back }}"><button class="btn sm danger">방출</button></form>
+{% endif %}
+</td></tr>
+{% else %}<tr><td colspan="11" class="mute">선수가 없습니다.</td></tr>{% endfor %}
+</tbody></table></div>
+{% endblock %}

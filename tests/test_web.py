@@ -60,3 +60,32 @@ def test_no_slot_redirects_to_new(tmp_path):
     from gridiron.web.app import app
     c = TestClient(app)
     assert c.get("/home", follow_redirects=False).headers["location"] == "/new"
+
+
+def test_squad_pages(client):
+    for url in ("/roster", "/roster?tab=ps", "/roster?tab=ir", "/roster?tab=fa&pos=WR", "/roster?team=S02",
+                "/depth", "/depth?unit=defense", "/depth?unit=special", "/injuries"):
+        r = client.get(url)
+        assert r.status_code == 200, url
+    pid = re.search(r'/player/([^"]+)"', client.get("/roster?team=S02").text).group(1)
+    t = _text(client.get(f"/player/{pid}").text)
+    assert "능력치" in t and "포지션별 PR" in t and "비공개" in t       # 다른 팀 선수: 범위·숨김 비공개
+
+
+def test_roster_actions(client):
+    fa = re.search(r'/roster/sign_ps/([^"]+)"', client.get("/roster?tab=fa").text).group(1)
+    r = client.post(f"/roster/sign_ps/{fa}", data={"back": "/roster?tab=ps"}, follow_redirects=True)
+    assert "연습 스쿼드 영입" in r.text or "가득" in r.text
+    r = client.post(f"/roster/release/{fa}", data={"back": "/roster?tab=ps"}, follow_redirects=True)
+    assert r.status_code == 200
+
+
+def test_depth_save_and_auto(client):
+    html = client.get("/depth").text
+    ids = re.findall(r'data-slot="QB">\s*<div class="dragitem" data-id="([^"]+)"', html)
+    assert ids
+    r = client.post("/depth", json={"QB": list(reversed(re.findall(
+        r'data-id="([^"]+)"', html.split('data-slot="QB"')[1].split('data-slot=')[0])))})
+    assert r.json()["ok"]
+    r = client.post("/depth/auto", data={"unit": "offense"}, follow_redirects=True)
+    assert "자동 편성 완료" in r.text

@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}뎁스차트 · Gridiron Manager{% endblock %}
+{% block head %}<script src="/static/vendor/Sortable.min.js"></script>{% endblock %}
+{% block content %}
+<div class="row"><h1 style="margin:0">뎁스차트</h1>
+  <form method="post" action="/depth/auto" class="right"><input type="hidden" name="unit" value="{{ unit }}"><button class="btn" title="PR·컨디션·부상 기준 자동 편성 (AI 팀과 같은 로직)">⚙ {{ units[unit] }} 자동 편성</button></form></div>
+<p class="mute small">끌어서 순서를 바꾸거나 오른쪽 후보를 슬롯으로 끌어 넣으세요. 맨 위가 주전입니다. 밖으로 빼려면 휴지통으로 끌어 놓으세요. 변경은 바로 저장됩니다.</p>
+{% include "partials/flash.html" %}
+<div class="tabs">{% for k, v in units.items() %}<a href="/depth?unit={{ k }}" class="{{ 'on' if unit == k }}">{{ v }}</a>{% endfor %}</div>
+<div id="warns">{% if warns %}<div class="err"><b>경고 {{ warns|length }}개</b> — {{ warns[:8]|join(' · ') }}{% if warns|length > 8 %} …{% endif %}</div>{% endif %}</div>
+<div class="grid c3">
+{% for s in slots %}
+<div class="card">
+  <h2>{{ s.slot }}</h2>
+  <div class="slot" data-slot="{{ s.slot }}">
+  {% for c in s.players %}
+    <div class="dragitem" data-id="{{ c.id }}"><span>{{ loop.index }}. {{ c.name }} <span class="mute small">{{ c.pos }}</span>
+      {% if c.inj %}<span class="pill out">부상</span>{% elif c.out %}<span class="pill ir">명단 외</span>{% endif %}{% if not c.fit %}<span class="pill q" title="포지션 부적합">부적합</span>{% endif %}</span>
+      <span class="r {{ c.slot_pr|grade }}">{{ c.slot_pr|f1 }}</span></div>
+  {% endfor %}
+  </div>
+  {% if s.pool %}<details style="margin-top:6px"><summary class="small mute">후보 {{ s.pool|length }}명</summary>
+  <div class="pool" data-slot="{{ s.slot }}">{% for c in s.pool %}<div class="dragitem" data-id="{{ c.id }}"><span>{{ c.name }} <span class="mute small">{{ c.pos }}</span></span><span class="r {{ c.slot_pr|grade }}">{{ c.slot_pr|f1 }}</span></div>{% endfor %}</div></details>{% endif %}
+</div>
+{% endfor %}
+<div class="card"><h2>🗑 빼기</h2><div class="slot trash" style="min-height:60px;border:1px dashed var(--line);border-radius:6px"></div></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function chart(){const d={};document.querySelectorAll('.slot[data-slot]').forEach(el=>{d[el.dataset.slot]=[...el.children].map(c=>c.dataset.id)});return d}
+function save(){fetch('/depth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(chart())})
+ .then(r=>r.json()).then(j=>{const w=document.getElementById('warns');w.innerHTML=j.warnings.length?'<div class="err"><b>경고 '+j.warnings.length+'개</b> — '+j.warnings.slice(0,8).join(' · ')+'</div>':'<div class="flash">저장했습니다. 경고 없음</div>';
+ document.querySelectorAll('.slot[data-slot]').forEach(el=>[...el.children].forEach((c,i)=>{const s=c.querySelector('span');if(s&&/^\d+\./.test(s.firstChild.textContent))s.firstChild.textContent=s.firstChild.textContent.replace(/^\d+\./,(i+1)+'.')}))})}
+document.querySelectorAll('.slot[data-slot]').forEach(el=>new Sortable(el,{group:{name:'u',pull:true,put:true},animation:120,ghostClass:'ghost',onSort:save}));
+document.querySelectorAll('.pool').forEach(el=>new Sortable(el,{group:{name:'u',pull:'clone',put:false},sort:false,animation:120}));
+new Sortable(document.querySelector('.trash'),{group:{name:'u',put:true},onAdd:e=>{e.item.remove();save()}});
+</script>
+{% endblock %}

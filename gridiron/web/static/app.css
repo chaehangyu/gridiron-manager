@@ -3,7 +3,7 @@
 --win:#3fbf6a;--loss:#e05252;--warn:#e8a33d;--g1:#c0392b;--g2:#e67e22;--g3:#d4ac0d;--g4:#58b947;--g5:#1fa774;--g6:#3d9df2}
 *{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif}
 a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
-.layout{display:grid;grid-template-columns:200px 1fr;min-height:100vh}
+.layout{display:grid;grid-template-columns:200px 1fr;min-height:100vh;background:linear-gradient(90deg,#0d1116 200px,var(--bg) 200px)}
 nav.side{background:#0d1116;border-right:1px solid var(--line);padding:12px 0;position:sticky;top:0;height:100vh;overflow:auto}
 nav.side .brand{font-weight:700;padding:4px 16px 12px;font-size:15px}
 nav.side a{display:block;padding:7px 16px;color:var(--mute)}nav.side a:hover{background:var(--panel);text-decoration:none;color:var(--text)}

@@ -122,3 +122,28 @@ def engine_depth(team: Team, players: dict[str, Player]) -> dict[str, list[str]]
 
 
 __all__ = ["auto_depth_chart", "engine_depth", "defense_slots"]
+
+
+def validate_depth(team: Team, players: dict[str, Player]) -> list[str]:
+    """뎁스차트 유효성 경고 (PRD F3-7): 빈 슬롯, 주전 부상·비활성, 포지션 부적합, 주전 중복."""
+    out = []
+    starters: dict[str, str] = {}
+    for slot in all_slots(team.front):
+        ids = [i for i in team.depth_chart.get(slot, []) if i in players]
+        if not ids:
+            out.append(f"{slot}: 빈 슬롯")
+            continue
+        p = players[ids[0]]
+        if p.team != team.abbr or p.roster_status != RosterStatus.ACTIVE:
+            out.append(f"{slot}: 주전 {p.name}이(가) 53인 로스터에 없음")
+        elif p.injured:
+            out.append(f"{slot}: 주전 {p.name} 부상 결장")
+        if p.position not in SLOT_POSITIONS[slot] and slot not in ("KR", "PR", "H"):
+            out.append(f"{slot}: {p.name}({p.position.value}) 포지션 부적합")
+        for grp in _EXCLUSIVE_GROUPS:
+            if slot in grp:
+                key = ",".join(grp)
+                if starters.get(key + p.id):
+                    out.append(f"{slot}: {p.name}이(가) {starters[key + p.id]}에도 주전")
+                starters[key + p.id] = slot
+    return out

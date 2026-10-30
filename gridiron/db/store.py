@@ -445,3 +445,13 @@ def news(path: Path, season: int, limit: int = 50) -> list[S.NewsRow]:
     with Session(eng) as s:
         return list(s.exec(select(S.NewsRow).where(S.NewsRow.season == season)
                            .order_by(S.NewsRow.id.desc()).limit(limit)))
+
+
+def save_depth_chart(path: Path, team: Team) -> None:
+    eng = engine_for(path)
+    with Session(eng) as s:
+        s.exec(delete(S.DepthChartRow).where(S.DepthChartRow.team == team.abbr))
+        for slot, ids in team.depth_chart.items():
+            for i, pid in enumerate(ids):
+                s.add(S.DepthChartRow(team=team.abbr, slot=slot, order=i, player_id=pid))
+        s.commit()

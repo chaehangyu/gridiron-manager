@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}부상 관리 · Gridiron Manager{% endblock %}
+{% block content %}
+<h1>부상 관리 — {{ ctx.league.teams[abbr].name }}</h1>
+<p class="mute">공식 부상 리포트는 리그 전체에 공개됩니다. 훈련 참여는 의료진 권고가 자동 적용됩니다. IR 최소 {{ rules.min_games }}경기, 복귀 지정 {{ used }}/{{ rules.return_designations }}회 사용.</p>
+{% include "partials/flash.html" %}
+<div class="card">
+<table>
+<thead><tr><th>포지션</th><th>이름</th><th>부상</th><th>심각도</th><th>예상 결장</th><th>상태</th><th>훈련</th><th class="num">결장</th><th></th></tr></thead>
+<tbody>
+{% for r in rows %}
+<tr><td>{{ r.pos }}</td><td><a href="/player/{{ r.id }}">{{ r.name }}</a></td><td>{{ r.injury }}</td><td class="small">{{ r.severity }}</td><td>{{ r.range }}</td>
+<td>{% if r.ir %}<span class="pill ir">IR</span>{% else %}<span class="pill {{ 'q' if r.status == '출전 의문' else 'out' }}">{{ r.status }}</span>{% endif %}{% if r.sit %} <span class="pill">휴식 결정</span>{% endif %}</td>
+<td>{{ r.practice }}</td><td class="num">{{ r.missed }}</td>
+<td class="row" style="gap:4px;flex-wrap:nowrap">{% if own %}
+  {% if r.questionable %}
+    {% if r.sit %}<form method="post" action="/injuries/play/{{ r.id }}"><button class="btn sm">출전시키기</button></form>
+    {% else %}<form method="post" action="/injuries/sit/{{ r.id }}"><button class="btn sm" title="{{ '뇌진탕 프로토콜 통과 단계' if r.concussion else '강행 출전 시 성능 −3%, 부상 위험 ×1.5' }}">쉬게 하기</button></form>{% endif %}
+  {% endif %}
+  {% if not r.ir %}<form method="post" action="/injuries/ir/{{ r.id }}" onsubmit="return confirm('IR에 올리면 최소 {{ rules.min_games }}경기 결장합니다.')"><button class="btn sm">IR 등재</button></form>
+  {% elif r.can_activate and r.can_activate[0] %}<form method="post" action="/injuries/activate/{{ r.id }}"><button class="btn sm primary">복귀 지정</button></form>
+  {% elif r.can_activate %}<span class="small mute">{{ r.can_activate[1] }}</span>{% endif %}
+{% endif %}</td></tr>
+{% else %}<tr><td colspan="9" class="mute">부상자가 없습니다.</td></tr>{% endfor %}
+</tbody></table></div>
+{% if league_rows %}
+<h2 style="margin-top:18px">리그 부상 리포트</h2>
+<div class="grid c3">{% for a, rs in league_rows %}<div class="card"><h2><a href="/injuries?team={{ a }}">{{ ctx.league.teams[a].name }}</a></h2>
+<table>{% for r in rs[:6] %}<tr><td>{{ r.pos }}</td><td>{{ r.name }}</td><td><span class="pill {{ 'q' if r.status == '출전 의문' else 'out' }}">{{ r.status }}</span></td></tr>{% endfor %}</table></div>{% endfor %}</div>
+{% endif %}
+{% endblock %}
