@@ -107,6 +107,32 @@ async def tactics_preset(request: Request):
     return RedirectResponse(f"/tactics?msg=프리셋 {off}+{dfn} 적용", status_code=303)
 
 
+@router.post("/tactics/user-preset")
+async def tactics_user_preset(request: Request):
+    """사용자 프리셋 (F4-7c): 현재 전술 저장 / 불러오기 / 삭제."""
+    ctx = need_ctx(request)
+    form = await request.form()
+    action, name = form.get("action"), (form.get("name") or "").strip()[:30]
+    presets = ctx.league.user_presets
+    if action == "save" and name:
+        d = ctx.team.tactics.to_dict()
+        d["name"] = name
+        presets[name] = d
+        msg = f"현재 전술을 '{name}' 프리셋으로 저장했습니다"
+    elif action == "load" and name in presets:
+        t = Tactics.from_dict(presets[name])
+        ctx.team.tactics = t
+        msg = f"내 프리셋 '{name}' 적용"
+    elif action == "delete" and name in presets:
+        presets.pop(name)
+        msg = f"프리셋 '{name}' 삭제"
+    else:
+        return RedirectResponse("/tactics?err=프리셋 이름을 확인하세요", status_code=303)
+    store.save_team_state(ctx.path, ctx.league)
+    state.invalidate(ctx.path)
+    return RedirectResponse(f"/tactics?msg={msg}", status_code=303)
+
+
 @router.post("/tactics/preview", response_class=HTMLResponse)
 async def tactics_preview(request: Request):
     """HTMX: 폼 값으로 궁합·노출도 미리보기 (저장 안 함)."""

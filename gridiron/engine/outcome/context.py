@@ -37,6 +37,8 @@ class Side:
     fit_def: dict[str, float] = field(default_factory=dict)
     fit_off: dict[str, float] = field(default_factory=dict)
     usage: dict[str, float] = field(default_factory=dict)
+    form_off: float = 0.0                   # 그날 경기력 (M7c): 공격·수비 효율 이동, 경기 시작 때 뽑는다
+    form_def: float = 0.0
     summary: dict = field(default_factory=lambda: {
         "off": {"plays": 0.0, "pass": 0.0, "xpass": 0.0, "fam": {}, "pa": 0.0},
         "def": {"pass_faced": 0.0, "runs_faced": 0.0, "cov": {}, "blitz": 0.0, "box": {}}})

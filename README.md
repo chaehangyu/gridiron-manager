@@ -19,7 +19,7 @@ Football Manager 스타일의 NFL 미식축구 매니지먼트 시뮬레이션 �
 | M4 전술·학습·훈련 | ✅ | 3계층 전술(철학·상황별·주간 게임플랜)·프리셋, 콜별 능력치 가중치(궁합), 전술 숙련도, 주간 훈련, 경기 중 상대 성향 학습(믿음·대응·읽힘), AI 팀 실측 성향 전술, 스카우팅 리포트. 검증 T1–T9 중 7개 통과, T5·T6 미달 (ENGINE_DESIGN §15) |
 | M5 시즌 + 부상 + 운영 | ✅ | 공식 타이브레이커(2021–2025 실제 대진 재현)·플레이오프, 실측 부상 모델(2.2건/팀경기)·IR·주간 리포트, 53/PS/48 로스터·FA 대체 영입, 구단주 기대치(엔진 200시즌 투영)·신뢰도·평가, 스카우팅 파악도·능력치 범위, 역할 평가 |
 | M6 웹 UI | ✅ | 브라우저에서 새 게임부터 슈퍼볼까지: 홈·인박스, 로스터·FA, 선수 프로필, 드래그 뎁스차트, 전술(실시간 궁합·노출도, 엔진 비교), 게임플랜, 훈련, 부상, 스카우팅, 매치 센터(중계 재생·승률 그래프·박스스코어·드라이브), 순위·플레이오프, 리그 통계, 구단주 |
-| M7 폴리싱 | 다음 | 전술 효과 리포트, 선수 평점, 시즌 어워드, 엔진 보정 |
+| M7 폴리싱 | ✅ | 전술 효과 리포트(플레이 패밀리·커버리지별 EPA, 쿼터별 효율), 선수 평점·경기 MVP, 시즌 어워드·올프로, 사용자 전술 프리셋, 엔진 보정(그날 경기력 변동, 타깃·캐리 분배, 패스·INT 수준) |
 
 경기 결과는 **실측 결과 모델**(nflverse 2022–2025 약 16만 플레이 기반)로 계산합니다. 1,000경기 리그 평균이 PRD 보정 목표를 모두 만족합니다 (ENGINE_DESIGN §13).
 선수 능력치는 **직전 3시즌 실제 기록으로 산출**합니다 (`data/real/2026/ratings.csv`). 같은 방식으로 2022–2024 기록만 써서 2025 시즌을 재현하면
@@ -58,6 +58,7 @@ gridiron injuries --save saves/career.sqlite                       # 부상 리�
 gridiron roster --save saves/career.sqlite                         # 53인·연습 스쿼드·IR·경기 당일 48인 (--release, --promote, --elevate …)
 gridiron fa --save saves/career.sqlite --pos WR                    # FA 풀 (--sign <id> [--ps])
 gridiron owner --save saves/career.sqlite                          # 구단주 목표·신뢰도·인박스 (--firing off)
+gridiron awards --save saves/career.sqlite                         # 시즌 어워드·올프로 (시즌 중엔 현재 레이스)
 gridiron player "Josh Allen" --save saves/career.sqlite            # 선수 프로필 (다른 팀 선수는 파악도 범위)
 gridiron scout --save saves/career.sqlite --assign next_opponent free_agents pos:WR
 gridiron quick --home KC --away BUF --pbp                          # 저장 없이 한 경기
@@ -75,6 +76,8 @@ python tools/validate_tactics.py all               # 엔진 검증 T1–T9 (M4, 
 python tools/calibrate_situations.py 4 1600        # 상황별 결과 보정값 적합 (M4)
 python tools/check_injuries.py 2                   # 부상 지표 vs 실측 (M5)
 python tools/check_owner.py 3                      # 구단주 기대치 vs 엔진 시즌 결과 (M5)
+python tools/check_variance.py 32 14               # 같은 매치업 득실차 잡음 SD (실측 ≈13.4, M7)
+python tools/check_usage.py 2                      # 타깃·캐리 점유율과 시즌 리더 기록 (M7)
 python tools/research/injury_rates.py              # 실측 부상률 → data/baseline/injuries.json
 python -m gridiron.baseline.tactics_data --season 2025   # 상성표·팀 성향 재생성
 python tools/research/measure_effects.py          # 실측 효과 크기 (ENGINE_DESIGN §2)

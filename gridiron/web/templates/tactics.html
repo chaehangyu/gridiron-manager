@@ -10,6 +10,12 @@
   <select name="off">{% for k, v in presets_off.items() %}<option value="{{ k }}" title="{{ v[0] }}">공격: {{ k }}</option>{% endfor %}</select>
   <select name="def">{% for k, v in presets_def.items() %}<option value="{{ k }}" title="{{ v[0] }}">수비: {{ k }}</option>{% endfor %}</select>
   <button class="btn" onclick="return confirm('프리셋으로 공격·수비 철학을 바꿉니다.')">프리셋 적용</button></form></div>
+<form method="post" action="/tactics/user-preset" class="row" style="margin:6px 0">
+  <span class="mute small">내 프리셋</span>
+  {% if ctx.league.user_presets %}<select name="name">{% for k in ctx.league.user_presets %}<option>{{ k }}</option>{% endfor %}</select>
+  <button class="btn sm" name="action" value="load">불러오기</button><button class="btn sm danger" name="action" value="delete">삭제</button>{% endif %}
+</form>
+<form method="post" action="/tactics/user-preset" class="row" style="margin:6px 0"><input name="name" placeholder="새 프리셋 이름" maxlength="30" required><button class="btn sm" name="action" value="save">현재 전술 저장</button></form>
 <p class="mute small">값은 리그 평균 대비 배율입니다 (1.0 = 리그 평균). 바꾸면 오른쪽에 궁합·노출도가 바로 계산됩니다. 저장해야 다음 경기에 적용됩니다.</p>
 {% include "partials/flash.html" %}
 <form method="post" action="/tactics" id="tform" hx-post="/tactics/preview" hx-trigger="change delay:250ms, input delay:400ms from:input[type=range]" hx-target="#preview" hx-swap="innerHTML">

@@ -255,6 +255,7 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--situ", nargs="+", help='상황 키와 값 (예: "3l|opp" pass=0.15 blitz=1.5)')
     p.add_argument("--clear-situ", action="store_true")
     p.add_argument("--preview", action="store_true", help="저장하지 않고 궁합 변화만 보기")
+    p.add_argument("--save-preset", help="현재 전술을 내 프리셋으로 저장 (불러오기: --preset my:<이름>)")
     p.set_defaults(func=cmd_tactics)
 
     p = sub.add_parser("gameplan", help="다음 상대 스카우팅 리포트와 이번 주 게임플랜 (F4-7)")

@@ -178,6 +178,7 @@ class League:
     owner: object = None                  # 사용자 팀 구단주 상태 (season.owner.OwnerState, M5d)
     knowledge: dict[str, float] = field(default_factory=dict)   # 사용자 팀의 선수 파악도 (기본값과 다른 것만, F13)
     scout_assignments: list[str] = field(default_factory=list)  # 스카우트 3명 배정 (F13-3)
+    user_presets: dict[str, dict] = field(default_factory=dict)  # 사용자 전술 프리셋 이름 → Tactics.to_dict (F4-7c)
 
     def roster(self, abbr: str, statuses: tuple[RosterStatus, ...] = (RosterStatus.ACTIVE,)) -> list[Player]:
         return [p for p in self.players.values() if p.team == abbr and p.roster_status in statuses]

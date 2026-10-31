@@ -97,7 +97,12 @@ def cmd_tactics(args) -> None:
     team = league.teams[abbr]
     t = team.tactics
     changed = False
-    if args.preset:
+    if args.preset and args.preset.startswith("my:"):
+        name = args.preset[3:]
+        if name not in league.user_presets:
+            sys.exit(f"내 프리셋: {list(league.user_presets) or '없음'}")
+        t, changed = Tactics.from_dict(league.user_presets[name]), True
+    elif args.preset:
         off, _, dfn = args.preset.partition("+")
         if off not in OFFENSE_PRESETS or (dfn and dfn not in DEFENSE_PRESETS):
             sys.exit(f"프리셋: 공격 {list(OFFENSE_PRESETS)} / 수비 {list(DEFENSE_PRESETS)} (예: west_coast+tampa2)")
@@ -126,11 +131,19 @@ def cmd_tactics(args) -> None:
         team.tactics = t
         save_team_state(path, league)
         print("전술을 저장했습니다.")
+    if getattr(args, "save_preset", None):
+        d = team.tactics.to_dict()
+        d["name"] = args.save_preset
+        league.user_presets[args.save_preset] = d
+        save_team_state(path, league)
+        print(f"현재 전술을 내 프리셋 '{args.save_preset}'으로 저장했습니다 (--preset my:{args.save_preset}).")
     print_tactics(league, abbr, team.tactics)
     print_familiarity(team)
     if not changed:
         print("\n프리셋: 공격 " + ", ".join(f"{k}({v[0]})" for k, v in OFFENSE_PRESETS.items()))
         print("        수비 " + ", ".join(f"{k}({v[0]})" for k, v in DEFENSE_PRESETS.items()))
+        if league.user_presets:
+            print("  내 프리셋: " + ", ".join(f"my:{k}" for k in league.user_presets))
 
 
 def _next_game(league, abbr):
@@ -221,3 +234,16 @@ def print_game_tactics(out, league, abbr: str) -> None:
           f"읽힘 손실 {rep['anticip_plays']}플레이 (평균 {rep['anticip_mean']:+.2f})")
     print(f"  궁합 손실 지수 {rep['fit_loss']:.1f} (우리 팀 콜이 선수에게 최적이 아니었던 정도) · 커버리지 붕괴 {rep['busts']}회")
     print(f"  상대 노출도 {orep.get('exposure', 0):.0f}/100 · 상대 대응 강도 {orep.get('lam', 0):.2f}")
+    # 플레이 패밀리별 효율 (F6-5)과 선수 평점 상위 (F6-6)
+    from .season import game_report as GR
+    g = out.game
+    tac = GR.tactical_report(out.box.get("plays", []), [g.home, g.away]).get(abbr)
+    if tac and tac["overall"]["n"]:
+        print(f"  공격 {tac['overall']['n']}플레이 · 성공률 {tac['overall']['success']:.0%} · EPA/플레이 {tac['overall']['epa']:+.2f}")
+        print("  " + " · ".join(f"{f} {a['n']}회 {a['epa']:+.2f}" for f, a in tac["families"].items()))
+        print("  쿼터별 EPA/플레이: " + ", ".join(f"{'Q' + str(q) if q <= 4 else 'OT'} {a['epa']:+.2f}"
+                                             for q, a in tac["quarters"].items()))
+    players = [(pid, t, st) for pid, (t, st) in out.box["players"].items()]
+    rs = GR.player_ratings(league, g, players, out.box["teams"])
+    if rs:
+        print("  선수 평점: " + ", ".join(f"{r['name']}({r['team']} {r['pos']}) {r['rating']}" for r in rs[:5]))

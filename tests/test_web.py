@@ -203,3 +203,18 @@ def test_awards_after_season(client):
     assert res["final"] and res["mvp"] and len(res["all_pro"][2][1]) == 3      # WR 1팀 3명
     news = _text(client.get("/home").text)
     assert "🏅" in news
+
+
+def test_user_tactic_presets(client):
+    """F4-7c: 사용자 전술 프리셋 저장·불러오기·삭제 (세이브에 남는다)."""
+    r = client.post("/tactics/user-preset", data={"action": "save", "name": "내전술"}, follow_redirects=True)
+    assert "저장했습니다" in r.text and "<option>내전술</option>" in r.text
+    client.post("/tactics/preset", data={"off": "air_raid", "def": "quarters"})
+    r = client.post("/tactics/user-preset", data={"action": "load", "name": "내전술"}, follow_redirects=True)
+    assert "내전술" in r.text and "적용" in r.text
+    from gridiron.db.store import load_league
+    from gridiron.web import state
+    league, _ = load_league(state.slot_path("web_test"))
+    assert "내전술" in league.user_presets
+    r = client.post("/tactics/user-preset", data={"action": "delete", "name": "내전술"}, follow_redirects=True)
+    assert "<option>내전술</option>" not in r.text

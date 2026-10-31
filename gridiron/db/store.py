@@ -83,7 +83,8 @@ def save_team_state(path: Path, league: League) -> None:
                                     intensity=tp.intensity))
         s.add(S.TacticsRow(team=LEAGUE_STATE, season=season, layer="state", week=0,
                            payload={"prepared_week": league.prepared_week, "league_tendency": league.league_tendency,
-                                    "ir_returns_used": league.ir_returns_used}))
+                                    "ir_returns_used": league.ir_returns_used,
+                                    "user_presets": league.user_presets}))
         players = league.players
         known = set()
         for row in s.exec(select(S.PlayerRow)):
@@ -179,6 +180,7 @@ def _load_team_state(s: Session, league: League) -> bool:
             league.prepared_week = r.payload.get("prepared_week", 0)
             league.league_tendency = r.payload.get("league_tendency")
             league.ir_returns_used = dict(r.payload.get("ir_returns_used") or {})
+            league.user_presets = dict(r.payload.get("user_presets") or {})
             continue
         t = league.teams.get(r.team)
         if t is None:

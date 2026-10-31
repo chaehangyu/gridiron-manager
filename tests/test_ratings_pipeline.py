@@ -12,6 +12,7 @@ from gridiron.ratings.position_rating import position_rating
 
 np = pytest.importorskip("numpy")
 pytest.importorskip("pandas")
+pytest.importorskip("scipy")      # 능력치 파이프라인은 data extra(scipy·scikit-learn)가 있어야 돈다
 
 from gridiron.ratings.derive import build as B  # noqa: E402
 from gridiron.ratings.derive import physical  # noqa: E402

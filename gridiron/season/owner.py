@@ -83,7 +83,7 @@ def project(league: League, power: dict, n: int = 200, seed: int = 0) -> dict[st
     sim = League(season=league.season, teams=league.teams, players={}, schedule=[])
     # 레이팅 추정 불확실성: 시즌마다 레이팅을 표준오차만큼 흔든다 (엔진 반복 수가 적을수록 크다)
     per_team = power.get("games", 544) * 2 / max(1, len(teams))
-    se = power.get("sd", MARGIN_SD) / math.sqrt(per_team + RIDGE)
+    se = 0.6 * power.get("sd", MARGIN_SD) / math.sqrt(per_team + RIDGE)   # 0.6: 릿지 수축으로 이미 줄어든 몫 (M7 재보정)
     for _ in range(n):
         pw = {**power, "ratings": {t: v + rng.gauss(0, se) for t, v in power["ratings"].items()}}
         sched = []

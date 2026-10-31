@@ -126,6 +126,10 @@ class DataOutcome:
         self.center = dict(p.get("center", {})) if center is None else center
         self.depth_ratio_power = p.get("depth_ratio_power", 1.0)
         self.cp = p["coordinator"]
+        self.form = p.get("game_form", {"sd": 0.0, "consistency_k": 0.0})
+        self.pass_level = p.get("pass_level", 0.0)
+        self.int_factor = p.get("int_factor", 1.0)
+        self.usage = p.get("usage", {"target_skill": 0.6, "rb2_share": 0.0, "rb3_share": 0.0})
         # 다운·거리 구간별 패스 결과 보정 (tools/calibrate_situations.py로 적합, M4 구현 노트)
         ss = (p.get("situation_shift") or {}) if situation_shift is None else situation_shift
         self.situ_shift = dict(ss.get("pass", {}))       # 다운·거리 구간별 (패스)
@@ -153,7 +157,29 @@ class DataOutcome:
             self._game = g
             self.sides = CX.build(g, self.center)
             self._cache = {}
+            self._draw_form(g)
         return self.sides
+
+    def _draw_form(self, g: "GameSim") -> None:
+        """그날 경기력 (ENGINE_DESIGN §16): 팀마다 공격·수비 효율을 N(0, sd·일관성 배율)만큼 이동.
+
+        플레이 단위 무작위만으로는 같은 매치업 반복 시 득실차 잔차 SD가 실제(≈13.4)보다 작다. 실제 팀은 날마다
+        경기력이 다르다. 주전들의 숨김 능력치 '일관성'이 높을수록 변동이 작다."""
+        sd, k = self.form["sd"], self.form["consistency_k"]
+        if sd <= 0:
+            return
+        for side in self.sides:
+            starters = [p for pos in ("QB", "RB", "WR", "TE", "OL", "DL", "LB", "CB", "S")
+                        for p in (g.team[side.t].depth.get(pos) or [])[:2]]
+            cons = sum(p.attributes.get("consistency", 10.5) for p in starters) / max(1, len(starters))
+            scale = sd * math.exp(-k * (cons - 10.5))
+            side.form_off = g.rng.gauss(0.0, scale)
+            side.form_def = g.rng.gauss(0.0, scale)
+
+    def _adv(self, g: "GameSim") -> float:
+        """공격 효율의 경기 단위 이동: 홈 이점 + 공격 팀 그날 공격력 − 수비 팀 그날 수비력."""
+        sides = self._ctx(g)
+        return self._home(g) + sides[g.o].form_off - sides[g.d].form_def
 
     def _home(self, g: "GameSim") -> float:
         """홈 공격이면 +, 원정 공격이면 − (중립 경기 0)."""
@@ -471,7 +497,8 @@ class DataOutcome:
         cands = [p for pos in ("WR", "TE", "RB") for p in (g.playersOnField[o].get(pos) or [])]
         pos_w = TARGET_POS_WEIGHT[depth]
         rec_w, qb_w = A.scheme("receiver", depth), A.scheme("qb", depth)
-        target = rng.choice(cands, lambda p: pos_w.get(p.pos, 0.1) * math.exp(0.6 * A.mix(p, rec_w, N)))
+        k_t = self.usage["target_skill"]
+        target = rng.choice(cands, lambda p: pos_w.get(p.pos, 0.1) * math.exp(k_t * A.mix(p, rec_w, N)))
         cov_players = self._on(g, d, "CB", "S", "LB")
         cov_w = A.scheme("coverage", cov_type)
         defender = rng.choice(cov_players, lambda p: math.exp(0.4 * A.mix(p, cov_w, N))
@@ -495,16 +522,18 @@ class DataOutcome:
         d_int = A.z(qb, "decision", N) - (A.z(defender, "ball_skills", N) if defender else 0.0) - c.get("int", 0.0)
         tacklers = self._on(g, d, "LB", "S", "CB")
         d_yac = A.mix(target, A.YAC, N) - A.unit(tacklers, A.TACKLE, N, 0.0) - c.get("yac", 0.0) + 0.5 * call.anticip
-        home = self._home(g)
+        home = self._adv(g)
         drill = call.drill
         situ = self.situ_shift.get(call.dd, 0.0) + self.situ_gs.get(call.gs, 0.0) + self.situ_fz.get(call.fz, 0.0)
 
         zone2 = "red" if call.zone in ("red", "goal") else "open"
         pa = int(call.play_action)
         rates = T.lookup("pass_rates", depth, passing_down, pressure, zone2, pa, call.coverage)
+        home += self.pass_level   # 패스 효율 수준 (M7c T1: 실측 드롭백 EPA에 맞춤)
         s_cmp = self.beta["completion"] * d_pass + home + drill   # 상황 보정은 야드(에어·YAC)에만
         p_cmp = 0.0 if throwaway else T.logit_shift(rates["cmp"], s_cmp)
-        p_int = 0.0 if throwaway else T.logit_shift(max(rates["int"], 1e-4), -self.beta["interception"] * d_int)
+        p_int = 0.0 if throwaway else self.int_factor * T.logit_shift(max(rates["int"], 1e-4),
+                                                                      -self.beta["interception"] * d_int)
 
         air = T.sample_quantile(T.lookup("pass_air", depth, zone2, pa, call.coverage), rng.random(),
                                 self.beta["air"] * d_pass + situ)
@@ -540,7 +569,7 @@ class DataOutcome:
     def run_play(self, g: "GameSim", positions: list[str], scramble: bool) -> RunPlan:
         rng, o, d = g.rng, g.o, g.d
         N = g.norms
-        home = self._home(g)
+        home = self._adv(g)
         yl = 100 - g.scrimmage
         tacklers = self._on(g, d, "LB", "S", "CB")
         if scramble:
@@ -571,6 +600,12 @@ class DataOutcome:
                 carrier = rng.choice(wrs, lambda p: A.a(p, "speed"))
             else:
                 carrier = rbs[0] if (len(rbs) == 1 or rng.random() < 0.8) else rng.choice(rbs[1:])
+                # RB 로테이션: 뎁스차트 RB2·RB3도 일정 비율로 공을 받는다 (실측 RB1 캐리 점유율 ≈ 0.55)
+                depth_rbs = [p for p in g.team[o].depth.get("RB", []) if not p.injured]
+                v = rng.random()
+                u2, u3 = self.usage["rb2_share"], self.usage["rb3_share"]
+                if len(depth_rbs) > 1 and carrier is depth_rbs[0] and v < u2 + u3:
+                    carrier = depth_rbs[1] if (v < u2 or len(depth_rbs) < 3) else depth_rbs[2]
 
         scheme = call.scheme
         front_name = getattr(g.team[d], "front", "4-3")

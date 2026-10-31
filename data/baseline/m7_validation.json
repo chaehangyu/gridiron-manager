@@ -1,0 +1,213 @@
+{
+ "teams": [
+  "ATL",
+  "PHI"
+ ],
+ "T1": {
+  "games": 1200,
+  "sim": {
+   "run_epa_by_box": {
+    "light": -0.0506,
+    "normal": -0.0814,
+    "heavy": -0.1367
+   },
+   "dropback_epa_pressure": {
+    "0": 0.2324,
+    "1": -0.4213
+   },
+   "pressure_by_blitz": {
+    "0": 0.2778,
+    "1": 0.4095
+   },
+   "quick_share": {
+    "C1": 0.3604,
+    "C2": 0.4994
+   },
+   "deep_share": {
+    "C0": 0.1419,
+    "C2": 0.1619
+   },
+   "dropback_epa_by_xpass": {
+    "lo": 0.0607,
+    "mid": 0.0769,
+    "hi": -0.0288
+   },
+   "heavy_box_by_pers": {
+    "11": 0.076,
+    "12": 0.1823,
+    "13": 0.2352
+   }
+  },
+  "real": {
+   "run_epa_by_box": {
+    "light": -0.052,
+    "normal": -0.093,
+    "heavy": -0.101
+   },
+   "dropback_epa_pressure": {
+    "0.0": 0.236,
+    "1.0": -0.481
+   },
+   "pressure_by_blitz": {
+    "0": 0.262,
+    "1": 0.393
+   },
+   "quick_share": {
+    "C1": 0.361,
+    "C2": 0.494
+   },
+   "deep_share": {
+    "C0": 0.13,
+    "C2": 0.149
+   },
+   "dropback_epa_by_xpass": {
+    "lo": 0.103,
+    "mid": 0.093,
+    "hi": 0.017
+   },
+   "heavy_box_by_pers": {
+    "11": 0.061,
+    "12": 0.146,
+    "13": 0.237
+   }
+  }
+ },
+ "T2": {
+  "sim_slope": -0.0895,
+  "real_slope": -0.086,
+  "ratio": 1.04,
+  "pass": true
+ },
+ "T3": {
+  "strong_ol_run_epa": {
+   "outside_zone": 0.0547,
+   "gap": 0.1575
+  },
+  "run_diff_gap_minus_zone": 0.1028,
+  "man_cb_pass_epa_allowed": {
+   "tampa2": 0.155,
+   "man_blitz": -0.1552
+  },
+  "pass_diff_zone_minus_man": 0.3102,
+  "pass": true
+ },
+ "T4": {
+  "learning": {
+   "first_half": 0.0562,
+   "second_half": 0.026,
+   "diff": -0.0302,
+   "se_diff": 0.0096,
+   "pass_rate": 0.8796
+  },
+  "control": {
+   "first_half": 0.0701,
+   "second_half": 0.052,
+   "diff": -0.0181,
+   "se_diff": 0.0097,
+   "pass_rate": 0.8778
+  },
+  "excess_drop": -0.0121,
+  "pass": true
+ },
+ "T5": {
+  "curves": {
+   "average": {
+    "0.15": 0.0315,
+    "0.25": 0.0345,
+    "0.35": 0.0233,
+    "0.45": 0.0276,
+    "0.55": 0.0344,
+    "0.7": 0.0277
+   },
+   "elite_run_weak_qb": {
+    "0.15": -0.0755,
+    "0.25": -0.0499,
+    "0.35": -0.0284,
+    "0.45": -0.0098,
+    "0.55": -0.0047,
+    "0.7": 0.0234
+   }
+  },
+  "best": {
+   "average": 0.15,
+   "elite_run_weak_qb": 0.7
+  },
+  "pass": false
+ },
+ "T6": {
+  "win_rate": {
+   "west_coast+tampa2": 0.459,
+   "west_coast+man_blitz": 0.532,
+   "west_coast+quarters": 0.455,
+   "air_raid+tampa2": 0.47,
+   "air_raid+man_blitz": 0.509,
+   "air_raid+quarters": 0.497,
+   "ground_pound+tampa2": 0.461,
+   "ground_pound+man_blitz": 0.519,
+   "ground_pound+quarters": 0.53,
+   "wide_zone+tampa2": 0.499,
+   "wide_zone+man_blitz": 0.57,
+   "wide_zone+quarters": 0.499
+  },
+  "max": 0.57,
+  "lopsided_pairs": {
+   "west_coast+tampa2 vs wide_zone+man_blitz": 0.3,
+   "west_coast+quarters vs wide_zone+man_blitz": 0.35,
+   "ground_pound+quarters vs wide_zone+tampa2": 0.65
+  },
+  "pass": true
+ },
+ "T7": {
+  "familiarity_by_week": [
+   {
+    "cov_man": 55.0,
+    "blitz": 60.0
+   },
+   {
+    "cov_man": 62.0,
+    "blitz": 63.5
+   },
+   {
+    "cov_man": 69.0,
+    "blitz": 67.0
+   },
+   {
+    "cov_man": 72.5,
+    "blitz": 74.0
+   },
+   {
+    "cov_man": 79.5,
+    "blitz": 77.5
+   },
+   {
+    "cov_man": 83.0,
+    "blitz": 84.5
+   }
+  ],
+  "pass_epa_allowed_by_week": {
+   "0": 0.051,
+   "1": 0.0395,
+   "2": 0.0192,
+   "3": 0.0101,
+   "4": -0.0006,
+   "5": -0.0106,
+   "baseline": -0.0082
+  },
+  "deficit_week0": 0.0592,
+  "deficit_week3": 0.0183,
+  "pass": true
+ },
+ "T8": {
+  "plays_checked": 4459,
+  "max_abs_error": 0.0001,
+  "pass": true
+ },
+ "T9": {
+  "sec_per_game": {
+   "off": 0.0737,
+   "on": 0.0785
+  },
+  "increase": 0.065,
+  "pass": true
+ }
+}
