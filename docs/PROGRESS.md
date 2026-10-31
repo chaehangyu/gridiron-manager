@@ -7,8 +7,8 @@
 |------|------|------|
 | M0–M4 | ✅ (main) | 데이터·엔진·능력치·전술. M4 검증 T5·T6 미달은 M7 보정 과제 |
 | M5 시즌 + 부상 + 운영 | ✅ (main, ead9b31) | 하위 단계는 아래 |
-| M6 웹 UI (HTMX) | ✅ (작업 브랜치) | S1–S16, 브라우저로 시즌 완주 확인 |
-| M7 폴리싱 | ✅ (작업 브랜치) | 리포트·평점·어워드·프리셋·엔진 보정 → **MVP 완료** |
+| M6 웹 UI (HTMX) | ✅ (main) | S1–S16, 브라우저로 시즌 완주 확인 |
+| M7 폴리싱 | ✅ (main) | 리포트·평점·어워드·프리셋·엔진 보정 → **MVP 완료** |
 
 ## M5 하위 단계
 - [x] **M5a 시즌 구조** — `gridiron/season/standings.py`(공식 타이브레이커·시드·플레이오프 대진·드래프트 순서), `season/runner.py`(경기·주 마감·라운드 생성·시즌 종료), CLI `sim-season`, `standings`. 2021–2025 실제 와일드카드 대진 5시즌 모두 일치(`tests/test_season.py`).
@@ -62,7 +62,7 @@ gridiron serve                 # http://127.0.0.1:8000 (세이브는 saves/, --s
 화면 확인: `python -m pip install playwright` 후 크로미움 `/opt/pw-browsers/chromium-*/chrome-linux64/chrome`.
 
 ## 새 세션 시작 문구 (복사해서 사용)
-> CLAUDE.md와 docs/PROGRESS.md를 읽고 M6(웹 UI)를 진행해줘. PROGRESS.md의 M6a → M6b → M6c → M6d 순서로, 하위 단계마다 테스트·커밋·푸시하고 PROGRESS.md를 갱신해줘. 컨텍스트가 부족해지면 현재 단계까지 정리해서 커밋하고 다음 세션용 메모를 남겨줘.
+> CLAUDE.md와 docs/PROGRESS.md를 읽고 "MVP 이후" 항목 중 <하고 싶은 작업>을 진행해줘. 하위 단계로 나눠 단계마다 테스트·커밋·푸시하고 PROGRESS.md를 갱신해줘. 컨텍스트가 부족해지면 현재 단계까지 정리해서 커밋하고 다음 세션용 메모를 남겨줘.
 
 ## 메모
 - 시즌 진행 훅: 주 시작 `weekly.prepare_week`, 경기 후 `weekly.after_game`, 주 마감 `runner.finish_week`. M5b–d는 여기에 붙인다.
