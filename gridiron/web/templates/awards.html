@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}어워드 · Gridiron Manager{% endblock %}
+{% block content %}
+<h1>{{ ctx.league.season }} 시즌 어워드{% if not res.final %} <span class="pill">현재 레이스</span>{% endif %}</h1>
+<p class="mute small">정규시즌 경기별 선수 평점의 평균 이상 기여(Σ(평점 − 6.0))로 뽑습니다. MVP는 팀 승수도 반영합니다. {{ min_games }}경기 이상 출전 선수만.</p>
+<div class="grid c3">
+{% for key, label in labels %}<div class="card"><h2>{{ label }}</h2>
+  {% for r in res[key] %}<div style="padding:6px 0;border-bottom:1px solid var(--line)" class="{{ 'me' if r.team == ctx.user }}">
+    <div class="row"><b>{{ loop.index }}. <a href="/player/{{ r.id }}">{{ r.name }}</a></b> <span class="mute small">{{ r.pos }} · {{ r.team }} {{ r.rec }}</span><span class="right r {{ r.avg|grade_ten }}">{{ '%.2f'|format(r.avg) }}</span></div>
+    <div class="small mute">{{ r.line }} · {{ r.games }}경기</div></div>
+  {% else %}<p class="mute">후보 없음</p>{% endfor %}</div>{% endfor %}
+</div>
+<div class="card" style="margin-top:14px"><h2>올프로 팀</h2>
+<table><tr><th>포지션</th><th>1팀</th><th>2팀</th></tr>
+{% for pos, first, second in res.all_pro %}<tr><td>{{ pos }}</td>
+<td>{% for r in first %}<a href="/player/{{ r.id }}" class="{{ 'w' if r.team == ctx.user }}">{{ r.name }}</a> <span class="mute small">{{ r.team }}</span>{{ ', ' if not loop.last }}{% endfor %}</td>
+<td>{% for r in second %}<a href="/player/{{ r.id }}">{{ r.name }}</a> <span class="mute small">{{ r.team }}</span>{{ ', ' if not loop.last }}{% endfor %}</td></tr>{% endfor %}
+</table></div>
+{% endblock %}

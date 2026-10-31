@@ -303,7 +303,28 @@ def cmd_scout(args) -> None:
     print(f"  FA 평균 파악도 {sum(ks) / max(1, len(ks)):.0f} ({len(fa)}명)")
 
 
+def cmd_awards(args) -> None:
+    from .db.store import load_league
+    from .season import awards as AW
+    path = Path(args.save)
+    league, user_team = load_league(path)
+    res = AW.compute(league, path)
+    print(f"\n{league.season} 시즌 어워드" + ("" if res["final"] else " — 현재 레이스 (정규시즌 진행 중)"))
+    for key, label in AW.AWARDS:
+        print(f"\n{label}")
+        for i, r in enumerate(res[key][:3]):
+            mark = " ◀" if r["team"] == user_team else ""
+            print(f"  {i + 1}. {r['name']} ({r['pos']}, {r['team']} {r['rec']}) 평균 평점 {r['avg']:.2f} · {r['line']}{mark}")
+    print("\n올프로 1팀")
+    for pos, first, _ in res["all_pro"]:
+        print(f"  {pos:<4} " + ", ".join(f"{r['name']}({r['team']})" for r in first))
+
+
 def add_parsers(sub) -> None:
+    p = sub.add_parser("awards", help="시즌 어워드·올프로 (시즌 중에는 현재 레이스)")
+    p.add_argument("--save", default="saves/career.sqlite")
+    p.set_defaults(func=cmd_awards)
+
     p = sub.add_parser("player", help="선수 프로필 (능력치·PR·역할·부상 이력·기록)")
     p.add_argument("name")
     p.add_argument("--save", default="saves/career.sqlite")

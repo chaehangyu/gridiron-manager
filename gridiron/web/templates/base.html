@@ -14,7 +14,7 @@
 <nav class="side">
   <div class="brand">🏈 Gridiron Manager</div>
   {% if ctx and ctx.user %}
-  {% set items = [("홈","/home"),("일정·순위","/standings"),("리그 통계","/stats")] %}
+  {% set items = [("홈","/home"),("일정·순위","/standings"),("리그 통계","/stats"),("어워드","/awards")] %}
   {% for label, href in items %}<a href="{{ href }}" class="{{ 'on' if nav.startswith(href) }}">{{ label }}</a>{% endfor %}
   <div class="grp">선수단</div>
   {% for label, href in [("로스터","/roster"),("뎁스차트","/depth"),("부상 관리","/injuries"),("스카우팅","/scout")] %}<a href="{{ href }}" class="{{ 'on' if nav.startswith(href) }}">{{ label }}</a>{% endfor %}

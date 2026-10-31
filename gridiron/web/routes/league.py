@@ -169,6 +169,14 @@ def stats_page(request: Request):
     return render(request, "stats.html", ctx, boards=boards, teams=teams)
 
 
+@router.get("/awards", response_class=HTMLResponse)
+def awards_page(request: Request):
+    ctx = need_ctx(request)
+    from ...season import awards as AW
+    return render(request, "awards.html", ctx, res=AW.compute(ctx.league, ctx.path), labels=AW.AWARDS,
+                  min_games=AW.MIN_GAMES)
+
+
 @router.get("/owner", response_class=HTMLResponse)
 def owner_page(request: Request):
     ctx = need_ctx(request)

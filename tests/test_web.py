@@ -188,3 +188,18 @@ def test_game_report_unit():
     rs = GR.player_ratings(lg, g, [(pid, t, s) for pid, (t, s) in out.box["players"].items()], out.box["teams"])
     assert rs and all(3.0 <= r["rating"] <= 10.0 for r in rs)
     assert GR.derive({"defTckSolo": 3, "defTckAst": 2, "fg30": 1, "fga30": 1, "fga40": 1})["defTck"] == 5
+
+
+def test_awards_after_season(client):
+    """M7b: 시즌이 끝난 뒤(위 test_season_to_end) 어워드·올프로."""
+    t = _text(client.get("/awards").text)
+    assert "MVP" in t and "올프로 팀" in t and "현재 레이스" not in t
+    from gridiron.web import state
+    from gridiron.season import awards as AW
+    import os
+    path = state.slot_path("web_test")
+    league, _ = state.load(path)
+    res = AW.compute(league, path)
+    assert res["final"] and res["mvp"] and len(res["all_pro"][2][1]) == 3      # WR 1팀 3명
+    news = _text(client.get("/home").text)
+    assert "🏅" in news
