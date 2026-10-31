@@ -217,6 +217,12 @@ def cmd_quick(args) -> None:
 
 
 def main(argv: list[str] | None = None) -> None:
+    # Windows 콘솔(cp949)에 없는 기호(★·✚·▶ 등)는 ?로 바꿔 출력이 멈추지 않게 한다
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(errors="replace")
+        except (AttributeError, ValueError):
+            pass
     ap = argparse.ArgumentParser(prog="gridiron", description="Gridiron Manager 명령줄 도구")
     sub = ap.add_subparsers(dest="cmd", required=True)
 

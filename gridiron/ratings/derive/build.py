@@ -101,7 +101,7 @@ def build(target: int, cache: Path, data_dir: Path) -> tuple[pd.DataFrame, dict]
     seasons = window(target)
     base = data_dir / "real" / str(target)
     ros = pd.read_csv(base / "players.csv", dtype={"gsis_id": str})
-    meta = json.loads((base / "meta.json").read_text())
+    meta = json.loads((base / "meta.json").read_text(encoding="utf-8"))
     season_start = date.fromisoformat(meta["first_game_day"])
 
     d = load_plays(cache, seasons)

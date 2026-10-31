@@ -33,6 +33,18 @@ pip install -e ".[dev,web]"      # 게임·웹 UI·테스트
 pip install -e ".[data]"         # 실데이터 수집이 필요할 때 (nflreadpy)
 ```
 
+### Windows
+
+```powershell
+py -m venv .venv
+.venv\Scripts\Activate.ps1          # 막히면: Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+pip install -e ".[dev,web]"
+gridiron serve                       # 또는 python -m gridiron serve
+```
+
+`gridiron` 명령을 찾을 수 없다고 나오면 pip가 실행 파일을 PATH 밖(Python의 `Scripts` 폴더)에 설치한 것이다.
+가상환경을 활성화하거나, 어디서든 `python -m gridiron <명령>`(예: `python -m gridiron serve`)으로 실행하면 된다.
+
 ## 사용법
 
 ```bash
