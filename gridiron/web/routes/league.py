@@ -4,6 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
+from ...season import game_report as GR
 from ...season import owner as O
 from ...season import standings as ST
 from ...season.runner import ROUND_LABEL
@@ -28,8 +29,11 @@ def match_page(request: Request, game_id: str, tab: str = "live"):
     if g is None:
         return HTMLResponse("경기를 찾을 수 없습니다", status_code=404)
     teams, players = match.box(ctx.path, game_id)
-    has_pbp = bool(match.load_events(ctx.path, game_id)) if g.played else False
-    tl = match.timeline(match.load_events(ctx.path, game_id), [g.home, g.away]) if has_pbp else None
+    events = match.load_events(ctx.path, game_id) if g.played else []
+    has_pbp = bool(events)
+    tl = match.timeline(events, [g.home, g.away]) if has_pbp else None
+    tac = GR.tactical_report(events, [g.home, g.away]) if has_pbp else None
+    ratings = GR.player_ratings(lg, g, players, teams) if g.played else []
     rows = []
     for key, lab in TEAM_STATS:
         a, h = teams.get(g.away, {}).get(key, 0), teams.get(g.home, {}).get(key, 0)
@@ -44,6 +48,7 @@ def match_page(request: Request, game_id: str, tab: str = "live"):
     qtrs = (teams.get(g.away, {}).get("ptsQtrs", []), teams.get(g.home, {}).get("ptsQtrs", []))
     ply = {"pass": [], "rush": [], "rec": [], "def": [], "kick": []}
     for pid, abbr, s in players:
+        s = GR.derive(s)
         p = lg.players.get(pid)
         name = p.name if p else pid
         base = {"id": pid, "name": name, "team": abbr}
@@ -65,7 +70,8 @@ def match_page(request: Request, game_id: str, tab: str = "live"):
     for k, key in (("pass", "y"), ("rush", "y"), ("rec", "y"), ("def", "tck")):
         ply[k].sort(key=lambda r: -r[key])
     return render(request, "match.html", ctx, g=views.game_row(lg, g, ctx.user), tab=tab, has_pbp=has_pbp, tl=tl,
-                  rows=rows, qtrs=qtrs, ply=ply, home=lg.teams[g.home], away=lg.teams[g.away])
+                  rows=rows, qtrs=qtrs, ply=ply, home=lg.teams[g.home], away=lg.teams[g.away], tac=tac,
+                  ratings=ratings, potg=ratings[0] if ratings else None)
 
 
 @router.get("/match/{game_id}/timeline.json")
@@ -126,7 +132,7 @@ def stats_page(request: Request):
                 continue
             d = tot.setdefault(r.player_id, {"team": r.team})
             d["team"] = r.team
-            for k, v in r.stats.items():
+            for k, v in GR.derive(r.stats).items():
                 if isinstance(v, (int, float)):
                     d[k] = d.get(k, 0) + v
         for r in s.exec(select(S.TeamGameStatsRow)):

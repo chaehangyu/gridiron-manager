@@ -12,10 +12,11 @@
   </div>
   {% if g.played and not live %}<table class="small" style="max-width:420px;margin:6px auto"><tr><th></th>{% for i in range(qtrs[0]|length) %}<th class="num">{{ 'Q' ~ (i + 1) if i < 4 else 'OT' }}</th>{% endfor %}<th class="num">합계</th></tr>
     <tr><td>{{ g.away }}</td>{% for v in qtrs[0] %}<td class="num">{{ v }}</td>{% endfor %}<td class="num"><b>{{ g['as'] }}</b></td></tr>
-    <tr><td>{{ g.home }}</td>{% for v in qtrs[1] %}<td class="num">{{ v }}</td>{% endfor %}<td class="num"><b>{{ g.hs }}</b></td></tr></table>{% endif %}
+    <tr><td>{{ g.home }}</td>{% for v in qtrs[1] %}<td class="num">{{ v }}</td>{% endfor %}<td class="num"><b>{{ g.hs }}</b></td></tr></table>
+  {% if potg %}<div class="small">경기 MVP <a href="/player/{{ potg.id }}"><b>{{ potg.name }}</b></a> ({{ potg.pos }}, {{ potg.team }}) <span class="r {{ potg.rating|grade_ten }}">{{ potg.rating }}</span></div>{% endif %}{% endif %}
 </div>
 {% if not g.played %}<p class="mute">아직 치르지 않은 경기입니다.</p>{% else %}
-<div class="tabs" style="margin-top:12px">{% for k, v in [("live","중계"),("box","박스스코어"),("drives","드라이브"),("report","전술 리포트")] %}<a href="?tab={{ k }}" class="{{ 'on' if tab == k }}">{{ v }}</a>{% endfor %}</div>
+<div class="tabs" style="margin-top:12px">{% for k, v in [("live","중계"),("box","박스스코어"),("ratings","선수 평점"),("drives","드라이브"),("report","전술 리포트")] %}<a href="?tab={{ k }}" class="{{ 'on' if tab == k }}">{{ v }}</a>{% endfor %}</div>
 
 {% if tab == 'live' %}
   {% if not has_pbp %}<p class="mute">이 경기는 중계 기록 없이 진행됐습니다 (우리 팀 경기만 중계를 저장합니다). 박스스코어를 보세요.</p>
@@ -51,12 +52,15 @@
     {% for r in ply.def[:12] %}<tr><td><a href="/player/{{ r.id }}">{{ r.name }}</a></td><td class="mute">{{ r.team }}</td><td class="num">{{ r.tck }}</td><td class="num">{{ r.sk }}</td><td class="num">{{ r.int }}</td><td class="num">{{ r.pd }}</td></tr>{% endfor %}</table>
     <table style="margin-top:8px">{% for r in ply.kick %}<tr><td>{{ r.name }}</td><td class="mute">{{ r.team }}</td><td>FG {{ r.fg }}</td><td>펀트 {{ r.pnt }} ({{ r.py }}yd)</td></tr>{% endfor %}</table></div>
   </div>
+{% elif tab == 'ratings' %}
+  <div class="grid c2">{% for abbr in (g.away, g.home) %}<div class="card"><h2>{{ abbr }} 선수 평점 (10점 만점, 6.0 = 평균)</h2><table>
+  {% for r in ratings if r.team == abbr %}<tr><td>{{ r.pos }}</td><td><a href="/player/{{ r.id }}">{{ r.name }}</a></td><td class="num"><span class="r {{ r.rating|grade_ten }}">{{ r.rating }}</span></td></tr>{% endfor %}</table></div>{% endfor %}</div>
 {% elif tab == 'drives' %}
   {% if not tl %}<p class="mute">중계 기록이 있는 경기만 드라이브 차트를 볼 수 있습니다.</p>{% else %}
   <div class="card"><table><tr><th>쿼터</th><th>시각</th><th>공격</th><th>시작</th><th class="num">플레이</th><th class="num">야드</th><th>결과</th><th style="width:35%"></th></tr>
   {% for d in tl.drives %}<tr><td>{{ d.q }}</td><td>{{ d.clock }}</td><td><b>{{ d.team }}</b></td><td>{{ d.start_txt }}</td><td class="num">{{ d.plays }}</td><td class="num">{{ d.yds }}</td>
     <td class="{{ 'w' if d.result in ('TD','FG') else 'l' if d.result == '턴오버' else '' }}">{{ d.result }}</td>
-    <td><div style="position:relative;height:10px;background:#0f141a;border-radius:4px"><i style="position:absolute;height:10px;border-radius:4px;left:{{ [d.start, d.end]|min }}%;width:{{ ([d.end - d.start, 1]|max) if d.end >= d.start else (d.start - d.end) }}%;background:{{ (home.color if d.t == 0 else away.color) }}"></i></div></td></tr>{% endfor %}
+    <td><div style="position:relative;height:10px;background:#0f141a;border-radius:4px"><i style="position:absolute;height:10px;border-radius:4px;left:{{ [d.start, d.end]|min }}%;width:{{ ([d.end - d.start, 1]|max) if d.end >= d.start else (d.start - d.end) }}%;background:{{ (home|vis if d.t == 0 else away|vis) }}"></i></div></td></tr>{% endfor %}
   </table><p class="small mute">막대: 공격 팀 기준 자기 진영(왼쪽) → 상대 엔드존(오른쪽)</p></div>
   {% endif %}
 {% elif tab == 'report' %}
@@ -67,12 +71,29 @@
     <tr><td>읽힘 손실 플레이 (평균 효과)</td><td class="num">{{ r.anticip_plays }} ({{ '%+.2f'|format(r.anticip_mean) }})</td></tr>
     <tr><td>궁합 손실 지수</td><td class="num">{{ r.fit_loss }}</td></tr><tr><td>커버리지 붕괴</td><td class="num">{{ r.busts }}회</td></tr>
     <tr><td>적용된 상대 대응 강도 λ</td><td class="num">{{ r.lam|round(2) }}</td></tr></table></div>{% endfor %}</div>
-  <p class="small mute">플레이 패밀리별 성공률·EPA, 쿼터별 효율 추이는 M7에서 추가합니다.</p>
+  {% if tac %}
+  <div class="grid c2" style="margin-top:14px">{% for abbr, r in tac.items() %}<div class="card"><h2>{{ abbr }} 공격 — 플레이 패밀리 (성공 = EPA &gt; 0)</h2>
+    <p class="small">전체 {{ r.overall.n }}플레이 · 성공률 {{ r.overall.success|pct }} · EPA/플레이 <b class="{{ 'w' if r.overall.epa > 0 else 'l' }}">{{ '%+.2f'|format(r.overall.epa) }}</b> · 런 {{ '%+.2f'|format(r.run.epa) }} ({{ r.run.n }}) / 패스 {{ '%+.2f'|format(r.pass.epa) }} ({{ r.pass.n }})</p>
+    <table><tr><th>콜</th><th class="num">시도</th><th class="num">성공률</th><th class="num">EPA/플레이</th><th class="num">합계</th></tr>
+    {% for f, a in r.families.items() %}<tr><td>{{ f }}</td><td class="num">{{ a.n }}</td><td class="num">{{ a.success|pct }}</td><td class="num {{ 'w' if a.epa > 0.05 else 'l' if a.epa < -0.05 }}">{{ '%+.2f'|format(a.epa) }}</td><td class="num">{{ '%+.1f'|format(a.total) }}</td></tr>{% endfor %}</table>
+    {% if r.covers %}<h2 style="margin-top:10px">상대 커버리지별 (패스)</h2><table>{% for c, a in r.covers.items() %}<tr><td>{{ c }}</td><td class="num">{{ a.n }}</td><td class="num">{{ a.success|pct }}</td><td class="num {{ 'w' if a.epa > 0.05 else 'l' if a.epa < -0.05 }}">{{ '%+.2f'|format(a.epa) }}</td></tr>{% endfor %}</table>{% endif %}
+  </div>{% endfor %}</div>
+  <div class="card" style="margin-top:14px"><h2>쿼터별 효율 추이 (EPA/플레이) — 후반에 떨어지면 상대가 성향을 읽은 것</h2><canvas id="qeff" height="90"></canvas></div>
+  {% endif %}
   {% endif %}
 {% endif %}
 {% endif %}
 {% endblock %}
 {% block scripts %}
+{% if tac and tab == 'report' %}
+<script src="/static/vendor/chart.umd.min.js"></script>
+<script>
+const Q = {{ tac|tojson }}; const names = Object.keys(Q); const qs = [...new Set(names.flatMap(n => Object.keys(Q[n].quarters)))].sort();
+new Chart(document.getElementById('qeff'), {type: 'bar', data: {labels: qs.map(q => q > 4 ? 'OT' : q + 'Q'),
+  datasets: names.map((n, i) => ({label: n, data: qs.map(q => (Q[n].quarters[q] || {epa: 0}).epa), backgroundColor: n === '{{ g.home }}' ? '{{ home|vis }}' : '{{ away|vis }}'}))},
+  options: {plugins: {legend: {labels: {color: '#e6ebf1'}}}, scales: {y: {ticks: {color: '#93a1b2'}}, x: {ticks: {color: '#93a1b2'}}}}});
+</script>
+{% endif %}
 {% if has_pbp and tab == 'live' %}
 <script>
 // 차트·프레임은 Alpine 반응형 밖에 둔다 (Chart.js 객체를 프록시하면 재귀 오류)
@@ -115,7 +136,7 @@ function tick() {
 document.addEventListener('alpine:initialized', async () => {
   Alpine.store('m').start = startReplay;
   const r = await fetch('/match/{{ g.id }}/timeline.json'); FRAMES = (await r.json()).frames;
-  CHART = new Chart(document.getElementById('wpc'), {type: 'line', data: {labels: [], datasets: [{data: [], borderColor: '{{ home.color }}', pointRadius: 0, tension: .2}]},
+  CHART = new Chart(document.getElementById('wpc'), {type: 'line', data: {labels: [], datasets: [{data: [], borderColor: '{{ home|vis }}', pointRadius: 0, tension: .2}]},
     options: {animation: false, plugins: {legend: {display: false}}, scales: {y: {min: 0, max: 100, ticks: {color: '#93a1b2', callback: v => v + '%'}}, x: {display: false}}}});
   startReplay('full');
 });

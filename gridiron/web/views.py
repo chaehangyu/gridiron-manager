@@ -118,8 +118,9 @@ def season_stats(path, pid: str, season: int) -> dict:
     with Session(engine_for(path)) as s:
         q = select(S.PlayerGameStatsRow, S.GameRow).where(S.PlayerGameStatsRow.player_id == pid) \
             .where(S.GameRow.id == S.PlayerGameStatsRow.game_id).where(S.GameRow.season == season)
+        from ..season.game_report import derive
         for r, _ in s.exec(q):
-            for k, v in r.stats.items():
+            for k, v in derive(r.stats).items():
                 if isinstance(v, (int, float)):
                     tot[k] = tot.get(k, 0) + v
     return tot
@@ -130,3 +131,17 @@ STAT_LABELS = [("gp", "경기"), ("snaps", "스냅"), ("pssCmp", "완성"), ("ps
                ("rusTD", "러싱TD"), ("tgt", "타깃"), ("rec", "리셉션"), ("recYds", "리시빙야드"), ("recTD", "리시빙TD"),
                ("defTck", "태클"), ("defSk", "색"), ("defInt", "INT"), ("defPssDef", "패스방어"), ("defFmbFrc", "강제 펌블"),
                ("fg", "FG 성공"), ("fga", "FG 시도"), ("pnt", "펀트"), ("pntYds", "펀트야드")]
+
+
+def vis_color(team) -> str:
+    """어두운 배경에서 보이는 팀 색 (주 색이 너무 어두우면 보조 색, 그것도 어두우면 회색)."""
+    def lum(h: str) -> float:
+        h = h.lstrip("#")
+        if len(h) != 6:
+            return 0.5
+        r, g, b = (int(h[i:i + 2], 16) / 255 for i in (0, 2, 4))
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b
+    for c in (team.color, team.color2):
+        if c and lum(c) > 0.12:
+            return c
+    return "#9aa5b1"

@@ -14,6 +14,8 @@ from . import state, views
 HERE = Path(__file__).parent
 templates = Jinja2Templates(directory=str(HERE / "templates"))
 templates.env.filters["grade"] = views.grade_class
+templates.env.filters["vis"] = views.vis_color
+templates.env.filters["grade_ten"] = lambda r: views.grade_class(4 + (r - 3) * 16 / 7)   # 평점 3–10 → 등급 색
 templates.env.filters["stars"] = lambda pr: "★" * int(stars(pr)) + ("½" if stars(pr) % 1 else "")
 templates.env.filters["pct"] = lambda x: "—" if x is None else f"{x * 100:.0f}%"
 templates.env.filters["f1"] = lambda x: "—" if x is None else f"{x:.1f}"

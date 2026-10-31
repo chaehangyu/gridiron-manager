@@ -199,8 +199,9 @@ def _season_stats(path: Path, pid: str, season: int) -> dict:
     with Session(engine_for(path)) as s:
         q = select(S.PlayerGameStatsRow, S.GameRow).where(S.PlayerGameStatsRow.player_id == pid) \
             .where(S.GameRow.id == S.PlayerGameStatsRow.game_id).where(S.GameRow.season == season)
+        from .season.game_report import derive
         for r, _ in s.exec(q):
-            for k, v in r.stats.items():
+            for k, v in derive(r.stats).items():
                 if isinstance(v, (int, float)):
                     tot[k] = tot.get(k, 0) + v
     return tot

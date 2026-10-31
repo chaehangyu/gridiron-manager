@@ -157,3 +157,34 @@ def test_season_to_end_in_browser_flow(client):
     assert "시즌 종료" in t
     t = _text(client.get("/standings?view=playoffs").text)
     assert "슈퍼볼" in t and "🏆" in client.get("/standings").text
+
+
+def test_match_reports_and_ratings(client):
+    """M7a: 전술 효과 리포트(패밀리·커버리지·쿼터)와 선수 평점."""
+    import re as _re
+    sched = client.get("/standings?view=mine").text
+    gid = _re.findall(r'/match/([^"?]+)"', sched)
+    for g in gid:
+        t = client.get(f"/match/{g}?tab=report").text
+        if "플레이 패밀리" in t:
+            assert "EPA/플레이" in t and "쿼터별 효율" in t
+            r = _text(client.get(f"/match/{g}?tab=ratings").text)
+            assert "선수 평점" in r and "경기 MVP" in _text(client.get(f"/match/{g}?tab=box").text)
+            return
+    raise AssertionError("중계 기록이 있는 경기가 없음")
+
+
+def test_game_report_unit():
+    from gridiron.data.sample import generate_sample_league
+    from gridiron.engine.api import simulate
+    from gridiron.season import game_report as GR
+    lg = generate_sample_league(season=2026)
+    g = lg.schedule[0]
+    out = simulate(lg, g, seed=5, play_by_play=True)
+    plays = GR.play_epa(out.box["plays"])
+    assert len(plays) > 80 and -0.4 < sum(p["epa"] for p in plays) / len(plays) < 0.4
+    rep = GR.tactical_report(out.box["plays"], [g.home, g.away])
+    assert set(rep) == {g.home, g.away} and rep[g.home]["families"]
+    rs = GR.player_ratings(lg, g, [(pid, t, s) for pid, (t, s) in out.box["players"].items()], out.box["teams"])
+    assert rs and all(3.0 <= r["rating"] <= 10.0 for r in rs)
+    assert GR.derive({"defTckSolo": 3, "defTckAst": 2, "fg30": 1, "fga30": 1, "fga40": 1})["defTck"] == 5
