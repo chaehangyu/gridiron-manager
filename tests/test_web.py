@@ -119,3 +119,41 @@ def test_gameplan_training_scout_save(client):
     assert "저장했습니다" in r.text and 'value="hard" selected' in r.text
     r = client.post("/scout", data={"s0": "next_opponent", "s1": "free_agents", "s2": "pos:WR"}, follow_redirects=True)
     assert 'value="pos:WR" selected' in r.text
+
+
+def test_play_user_game_and_match_center(client):
+    home = client.get("/home").text
+    if "우리 경기 진행" not in home:                     # 바이위크면 한 주 넘긴다
+        wait_job(client, client.post("/play/week", follow_redirects=False).headers["location"])
+    r = client.post("/play/game", follow_redirects=False)
+    target = wait_job(client, r.headers["location"])
+    assert target.startswith("/match/")
+    for tab in ("live", "box", "drives", "report"):
+        t = _text(client.get(f"{target}?tab={tab}").text)
+        assert client.get(f"{target}?tab={tab}").status_code == 200
+        if tab == "box":
+            assert "팀 기록" in t and "3rd down" in t
+        if tab == "drives":
+            assert "결과" in t
+        if tab == "report":
+            assert "노출도" in t
+    j = client.get(f"{target}/timeline.json").json()
+    assert len(j["frames"]) > 100 and j["frames"][-1]["head"] and len(j["wp"]) > 50
+
+
+def test_league_pages(client):
+    for v in ("division", "conference", "playoffs", "schedule", "mine"):
+        assert client.get(f"/standings?view={v}").status_code == 200, v
+    t = _text(client.get("/stats").text)
+    assert "패싱 야드" in t and "팀 순위" in t
+    assert client.get("/owner").status_code == 200
+
+
+def test_season_to_end_in_browser_flow(client):
+    """M6 완료 기준: 웹에서 시즌을 끝까지 진행 (샘플 리그)."""
+    r = client.post("/play/end", follow_redirects=False)
+    assert wait_job(client, r.headers["location"], timeout=1200) == "/home"
+    t = _text(client.get("/home").text)
+    assert "시즌 종료" in t
+    t = _text(client.get("/standings?view=playoffs").text)
+    assert "슈퍼볼" in t and "🏆" in client.get("/standings").text

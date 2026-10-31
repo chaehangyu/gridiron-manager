@@ -28,8 +28,10 @@ def play_game(path: Path, league: League, game: ScheduledGame, user_team: str | 
     start_week(path, league, game.week, user_team)
     out = simulate(league, game, seed=seed if seed is not None else seed_for(game), play_by_play=pbp,
                    user_team=user_team)
-    if pbp and out.wp_series:   # 매치 센터 승률 그래프용 (플레이 로그 끝에 함께 저장)
+    if pbp:   # 매치 센터용 (플레이 로그 끝에 함께 저장): 승률 추이, 전술 리포트
         out.box["plays"].append({"type": "wpSeries", "series": [list(x) for x in out.wp_series]})
+        out.box["plays"].append({"type": "tacticsReport", "report": {
+            a: {k: v for k, v in r.items() if k not in ("usage", "summary")} for a, r in (out.tactics or {}).items()}})
     record_game(path, game, {"overtimes": out.overtimes}, out.seed, out.box, tactics=out.tactics)
     after_game(league, out.tactics, out.box["players"])
     injuries.apply_game(league, game, out.injuries)

@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}리그 통계 · Gridiron Manager{% endblock %}
+{% block content %}
+<h1>리그 통계 (정규시즌)</h1>
+<div class="grid c3">{% for b in boards %}<div class="card"><h2>{{ b.label }}</h2><table>
+{% for r in b.rows %}<tr class="{{ 'me' if r.me }}"><td class="num mute">{{ loop.index }}</td><td><a href="/player/{{ r.id }}">{{ r.name }}</a> <span class="mute small">{{ r.pos }} {{ r.team }}</span></td><td class="num"><b>{{ r.v|round|int }}</b></td></tr>
+{% if r.x %}<tr class="{{ 'me' if r.me }}"><td></td><td colspan="2" class="small mute" style="border-top:0">{{ r.x }}</td></tr>{% endif %}{% else %}<tr><td class="mute">기록 없음</td></tr>{% endfor %}</table></div>{% endfor %}</div>
+<div class="card" style="margin-top:14px"><h2>팀 순위 (경기당)</h2><div class="scroll"><table>
+<tr><th>팀</th><th class="num">득점</th><th class="num">실점</th><th class="num">총 야드</th><th class="num">패싱</th><th class="num">러싱</th><th class="num">턴오버</th></tr>
+{% for t in teams %}<tr class="{{ 'me' if t.me }}"><td>{{ t.name }}</td><td class="num">{{ t.ppg|f1 }}</td><td class="num">{{ t.papg|f1 }}</td><td class="num">{{ t.ypg|f1 }}</td><td class="num">{{ t.pass|f1 }}</td><td class="num">{{ t.rush|f1 }}</td><td class="num">{{ t.to|f1 }}</td></tr>{% endfor %}</table></div></div>
+{% endblock %}

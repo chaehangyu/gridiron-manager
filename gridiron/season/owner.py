@@ -5,8 +5,8 @@
 엔진 시즌 한 번(약 30초 × 반복 수)이면 되므로 200회를 전부 엔진으로 돌리는 것과 같은 기대치를 빠르게 얻는다.
 
 신뢰도(F12-4): 시작 60. 경기마다 K × (결과 − 경기 전 예상 승률). 주간 목표 진행률을 소폭 반영.
-평가(F12-6): 주 목표 50% + 보조 목표 25% + 신뢰도 25% → A–F. 해고(F12-7): 20 미만 경고 2회 뒤 또 20 미만이면
-시즌 중 해고, 시즌 말 F면 해고. 리그 설정 `owner.firing`으로 끌 수 있다.
+평가(F12-6): 주 목표 40 + 보조 목표 각 15 + 신뢰도×0.3 → A–F. 해고(F12-7): 20 미만 경고 2회(3주 간격) 뒤 또 20 미만이고
+승률 5할 미만이면 시즌 중 해고, 시즌 말 F면 해고. 설정(웹 S12, CLI `owner --firing off`)으로 끌 수 있다.
 """
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ from . import standings as ST
 
 MARGIN_SD = 13.5          # NFL 경기 득실차 표준편차 (예상 대비). 파워 레이팅이 엔진 잔차로 덮어쓴다
 RIDGE = 5.0
-K_CONF = 12.0             # 신뢰도 변화 배율
+K_CONF = 8.0              # 신뢰도 변화 배율 — 시즌 합계는 K × (실제 승수 − 예상 승수)
 START_CONF = 60.0
 TIERS = {"contender": "우승 후보", "playoff": "플레이오프 경쟁", "middle": "중위권", "rebuild": "재건"}
 MAIN_GOAL_LABEL = {"conf_final": "컨퍼런스 결승 진출", "div_round": "디비저널 라운드 진출",
@@ -173,6 +173,7 @@ class OwnerState:
     sub_goals: list[str]
     confidence: float = START_CONF
     warnings: int = 0
+    last_warning_week: int = -99
     fired: bool = False
     grade: str | None = None
     history: list = field(default_factory=list)      # [(week, value, reason)]
@@ -236,17 +237,29 @@ def after_game(st: OwnerState, league: League, game: ScheduledGame) -> float:
     opp = game.away if game.home == st.team else game.home
     why = f"{'승' if res == 1 else '무' if res == 0.5 else '패'} vs {opp} (예상 승률 {p * 100:.0f}%)"
     st.history.append((game.week, round(st.confidence, 1), why))
-    _messages(st, game.week, delta, p, res)
+    _messages(st, game.week, delta, p, res, _win_pct(league, st.team))
     return delta
 
 
-def _messages(st: OwnerState, week: int, delta: float, p: float, res: float) -> None:
+WARN_COOLDOWN = 3       # 경고는 3주에 한 번까지
+
+
+def _win_pct(league: League, team: str) -> float:
+    r = ST.Table.from_league(league).rec(team)
+    return r.pct if r.g else 0.5
+
+
+def _messages(st: OwnerState, week: int, delta: float, p: float, res: float, win_pct: float = 0.5) -> None:
     if res == 1 and p < 0.35:
         st.inbox.append({"week": week, "kind": "praise", "text": "구단주: 아무도 기대하지 않은 승리였습니다. 훌륭합니다."})
     elif res == 0 and p > 0.7:
         st.inbox.append({"week": week, "kind": "concern", "text": "구단주: 이겨야 할 경기를 놓쳤습니다. 실망스럽군요."})
-    if st.confidence < 20 and st.firing:
+    if st.confidence < 20 and st.firing and week - st.last_warning_week >= WARN_COOLDOWN:
+        # 경고 2회 뒤 또 20 미만이면 시즌 중 해고 — 단 이기고 있는 팀(승률 5할 이상)은 시즌 말 평가까지 기다린다
+        if st.warnings >= 2 and win_pct >= 0.5:
+            return
         st.warnings += 1
+        st.last_warning_week = week
         if st.warnings > 2:
             st.fired = True
             st.inbox.append({"week": week, "kind": "fired",
@@ -267,7 +280,8 @@ def weekly_progress(st: OwnerState, league: League, week: int) -> None:
     if r.g == 0:
         return
     pace = (r.w + 0.5 * r.t) / r.g * 17
-    drift = max(-1.0, min(1.0, (pace - st.wins_mean) / 4))
+    # 경기 결과가 이미 기대 대비로 반영되므로 진행률은 작게 (같은 부진을 두 번 크게 깎지 않는다)
+    drift = max(-0.5, min(0.5, (pace - st.wins_mean) / 8))
     st.confidence = max(0.0, min(100.0, st.confidence + drift))
 
 
@@ -345,7 +359,7 @@ def achieved(goal: str, team: str, rec, stage: dict, in_playoffs: bool) -> bool:
 
 def season_review(st: OwnerState, league: League, path=None) -> tuple[str, dict]:
     res = goal_results(st, league, path)
-    score = 50 * res[st.main_goal] + 12.5 * sum(res[g] for g in st.sub_goals) + 0.25 * st.confidence
+    score = 40 * res[st.main_goal] + 15 * sum(res[g] for g in st.sub_goals) + 0.3 * st.confidence
     grade = "A" if score >= 80 else "B" if score >= 65 else "C" if score >= 50 else "D" if score >= 35 else "F"
     st.grade = grade
     if grade == "F" and st.firing:

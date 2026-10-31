@@ -43,18 +43,22 @@ def create_app() -> FastAPI:
     app = FastAPI(title="Gridiron Manager")
     app.mount("/static", StaticFiles(directory=str(HERE / "static")), name="static")
 
+    @app.middleware("http")
+    async def _one_job_at_a_time(request: Request, call_next):
+        """진행 작업(경기 시뮬)이 도는 동안 리그를 바꾸는 요청은 받지 않고 진행 화면으로 보낸다."""
+        from .jobs import running
+        job = running()
+        if job is not None and request.method == "POST" and not request.url.path.startswith("/tactics/preview"):
+            return RedirectResponse(f"/jobs/{job.id}", status_code=303)
+        return await call_next(request)
+
     @app.exception_handler(NoSlot)
     async def _no_slot(request: Request, exc: NoSlot):
         return RedirectResponse("/new", status_code=303)
 
-    from .routes import core
-    app.include_router(core.router)
-    for mod in ("squad", "tactics", "league"):
-        try:
-            m = __import__(f"gridiron.web.routes.{mod}", fromlist=["router"])
-        except ModuleNotFoundError:
-            continue
-        app.include_router(m.router)
+    from .routes import core, league, squad, tactics
+    for mod in (core, squad, tactics, league):
+        app.include_router(mod.router)
     return app
 
 

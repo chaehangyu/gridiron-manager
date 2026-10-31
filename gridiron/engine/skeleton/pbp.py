@@ -18,6 +18,8 @@ class PlayByPlayLogger:
         if g is not None:
             event.setdefault("clock", g.clock)
             event.setdefault("quarter", self.quarter)
+            if self.active:   # 매치 센터 스코어보드용 (그 시점 점수)
+                event["pts"] = [int(g.team[0].stat["pts"]), int(g.team[1].stat["pts"])]
         return event
 
     def logEvent(self, event: dict) -> None:
@@ -42,7 +44,9 @@ class PlayByPlayLogger:
 
     def logClock(self, **kw) -> None:
         if self.active:
-            self.events.append({"type": "clock", "quarter": self.quarter, **kw})
+            g = self.game
+            pts = [int(g.team[0].stat["pts"]), int(g.team[1].stat["pts"])] if g is not None else None
+            self.events.append({"type": "clock", "quarter": self.quarter, "pts": pts, **kw})
 
     def logStat(self, t: int, pid: str | None, stat: str, amount: float) -> None:
         # 실시간 박스스코어용. MVP에서는 경기 후 집계만 쓰므로 기록하지 않는다.

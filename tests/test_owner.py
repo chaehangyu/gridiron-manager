@@ -35,24 +35,43 @@ def test_confidence_moves_against_expectation(setup):
     up = O.after_game(st, lg, g)                              # 약팀이 강팀 원정 승리
     g2 = ScheduledGame("x2", 2026, 2, "REG", weak, strong, home_score=10, away_score=20)
     down = O.after_game(st, lg, g2)                           # 예상된 패배
-    assert up > 8 and -4 < down < 0
+    assert up > 6 and -3 < down < 0
     assert any(m["kind"] == "praise" for m in st.inbox)
 
 
 def test_warnings_then_firing(setup):
     lg, teams, power, proj = setup
     strong, weak = teams[0], teams[1]
+    import copy
+    lg = copy.deepcopy(lg)
     st = O.start_season(lg, strong, power=power, projection=proj)
-    for w in range(1, 12):
-        O.after_game(st, lg, ScheduledGame(f"l{w}", 2026, w, "REG", strong, weak, home_score=0, away_score=30))
+    mine = [g for g in lg.schedule if strong in (g.home, g.away)]
+    for w in range(1, 15):
+        g = mine[w - 1]
+        g.home_score, g.away_score = (0, 30) if g.home == strong else (30, 0)     # 계속 진다
+        O.after_game(st, lg, g)
         if st.fired:
             break
     assert st.fired and st.warnings == 3
+    warn_weeks = [m["week"] for m in st.inbox if m["kind"] in ("warning", "fired")]
+    assert all(b - a >= O.WARN_COOLDOWN for a, b in zip(warn_weeks, warn_weeks[1:]))      # 경고는 3주 간격
     st2 = O.start_season(lg, strong, power=power, projection=proj)
     st2.firing = False
     for w in range(1, 12):
         O.after_game(st2, lg, ScheduledGame(f"m{w}", 2026, w, "REG", strong, weak, home_score=0, away_score=30))
     assert not st2.fired
+
+
+def test_winning_team_not_fired_midseason(setup):
+    """경고 2회를 받았어도 승률 5할 이상이면 시즌 중 해고하지 않는다 (시즌 말 평가로)."""
+    lg, teams, power, proj = setup
+    strong, weak = teams[0], teams[1]
+    st = O.start_season(lg, strong, power=power, projection=proj)
+    st.warnings, st.confidence = 2, 15.0
+    O._messages(st, 10, -5.0, 0.8, 0.0, win_pct=0.6)
+    assert not st.fired
+    O._messages(st, 13, -5.0, 0.8, 0.0, win_pct=0.4)
+    assert st.fired
 
 
 def test_owner_saved_and_loaded(tmp_path, setup):

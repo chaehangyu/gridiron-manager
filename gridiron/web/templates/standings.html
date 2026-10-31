@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}일정·순위 · Gridiron Manager{% endblock %}
+{% block content %}
+<h1>일정 · 순위{% if champion %} <span class="pill">🏆 {{ ctx.league.teams[champion].name }}</span>{% endif %}</h1>
+<div class="tabs">{% for k, v in [("division","디비전"),("conference","컨퍼런스·시드"),("playoffs","플레이오프"),("schedule","주차별 일정"),("mine","우리 팀 일정")] %}<a href="?view={{ k }}" class="{{ 'on' if view == k }}">{{ v }}</a>{% endfor %}</div>
+{% if view == 'division' %}
+<div class="grid c2">{% for name, rows in divs %}<div class="card"><h2>{{ name }}</h2>
+<table><tr><th></th><th>팀</th><th class="num">전적</th><th class="num">득실</th><th class="num">디비전</th><th class="num">컨퍼런스</th></tr>
+{% for r in rows %}<tr class="{{ 'me' if r.me }}"><td>{% if r.seed %}<span class="pill">{{ r.seed }}</span>{% endif %}</td><td><span class="swatch" style="background:{{ r.color }}"></span> {{ r.name }}</td><td class="num">{{ r.rec }}</td><td class="num {{ 'w' if r.net > 0 else 'l' if r.net < 0 }}">{{ '%+d'|format(r.net) }}</td><td class="num">{{ r.div }}</td><td class="num">{{ r.conf }}</td></tr>{% endfor %}</table></div>{% endfor %}</div>
+<p class="small mute">순위·시드는 NFL 공식 타이브레이커(nflseedR 방식)로 계산합니다.</p>
+{% elif view == 'conference' %}
+<div class="grid c2">{% for conf, rows in conf_order.items() %}<div class="card"><h2>{{ conf }}</h2><table>
+{% for r in rows %}<tr class="{{ 'me' if r.me }}"><td class="num">{{ loop.index }}</td><td>{{ r.name }}</td><td class="num">{{ r.rec }}</td><td>{% if r.seed %}<span class="pill">{{ r.seed }}번 시드{{ ' · 바이' if r.seed == 1 }}</span>{% endif %}</td></tr>{% if loop.index == 7 %}<tr><td colspan="4" style="border-bottom:2px solid var(--accent)"></td></tr>{% endif %}{% endfor %}</table></div>{% endfor %}</div>
+{% elif view == 'playoffs' %}
+{% if not rounds %}<p class="mute">정규시즌이 끝나면 대진이 만들어집니다. 지금 시드 현황은 '컨퍼런스·시드' 탭에서 볼 수 있습니다.</p>{% endif %}
+<div class="grid" style="grid-template-columns:repeat({{ rounds|length or 1 }},minmax(0,1fr))">{% for name, gs in rounds %}<div class="card"><h2>{{ name }}</h2>
+{% for g in gs %}<div style="margin:8px 0;padding:6px;border:1px solid var(--line);border-radius:6px"><a href="/match/{{ g.id }}">
+  <div class="row"><span>{{ g.away }}</span><b class="right">{{ g['as'] if g.played else '' }}</b></div>
+  <div class="row"><span>{{ g.home }}</span><b class="right">{{ g.hs if g.played else '' }}</b></div></a></div>{% endfor %}</div>{% endfor %}</div>
+{% elif view == 'schedule' %}
+<form class="row" method="get"><input type="hidden" name="view" value="schedule"><label>주차 <select name="week" onchange="this.form.submit()">{% for w in weeks %}<option {{ 'selected' if w == wk }}>{{ w }}</option>{% endfor %}</select></label></form>
+<div class="card" style="margin-top:8px"><table>{% for g in sched %}<tr class="{{ 'me' if ctx.user in (g.home, g.away) }}"><td>{{ g.day }}</td><td>{{ g.away_name }}</td><td class="num">{{ g['as'] if g.played else '' }}</td><td>@</td><td>{{ g.home_name }}</td><td class="num">{{ g.hs if g.played else '' }}</td><td>{% if g.played %}<a href="/match/{{ g.id }}">결과</a>{% endif %}</td></tr>{% endfor %}</table></div>
+{% else %}
+<div class="card"><table>{% for g in mine %}<tr><td>{{ g.round if g.type != 'REG' else g.week ~ '주' }}</td><td>{{ g.day }}</td><td>{{ '@ ' ~ g.home_name if g.away == ctx.user else 'vs ' ~ g.away_name }}</td>
+<td class="{{ 'w' if g.wl == 'W' else 'l' if g.wl == 'L' }}"><b>{{ g.wl or '' }}</b> {{ (g['as'] ~ '–' ~ g.hs) if g.played else '' }}</td><td>{% if g.played %}<a href="/match/{{ g.id }}">결과</a>{% endif %}</td></tr>{% endfor %}</table></div>
+{% endif %}
+{% endblock %}

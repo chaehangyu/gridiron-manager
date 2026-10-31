@@ -84,7 +84,7 @@ def simulate(league: League, game: ScheduledGame, seed: int, *, outcome: Outcome
                 players[p.id] = (t.abbr, st)
     game.home_score = int(res["team"][0].stat["pts"])
     game.away_score = int(res["team"][1].stat["pts"])
-    events = [e for e in res["playByPlay"] if e["type"] != "clock"] if play_by_play else []
+    events = list(res["playByPlay"]) if play_by_play else []    # clock 이벤트(다운·거리·볼 위치·승률)도 저장
     tactics = outcome.report() if hasattr(outcome, "report") else {}
     new_inj = [{"pid": p.id, "team": t.abbr, **p.injury} for t in res["team"] for p in t.players
                if p.injury is not None]

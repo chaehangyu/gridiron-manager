@@ -13,7 +13,6 @@ from .. import jobs, state, views
 from ..app import need_ctx, render
 
 router = APIRouter()
-MATCH_PAGE = False      # 매치 센터(M6d)가 생기면 True
 
 
 def _teams_by_division(league) -> list[tuple[str, list]]:
@@ -172,7 +171,7 @@ def play(request: Request, what: str, pbp: int = Form(0)):
             job.log(f"{g.away} {out.away_score} @ {g.home} {out.home_score}", 0.9)
             for n in runner.finish_week(path, league, g.week, user):
                 job.log("• " + n)
-            return f"/match/{g.game_id}" if MATCH_PAGE else "/home"
+            return f"/match/{g.game_id}"
         job = jobs.start("우리 경기 진행", game_job)
     elif what == "week":
         job = jobs.start("이번 주 진행", lambda j: week_job(j, None))

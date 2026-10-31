@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}구단주 · Gridiron Manager{% endblock %}
+{% block head %}<script src="/static/vendor/chart.umd.min.js"></script>{% endblock %}
+{% block content %}
+<h1>구단주</h1>
+{% if not st %}<p class="mute">구단주 기대치가 아직 없습니다. 첫 경기를 진행하면 계산됩니다.</p>{% else %}
+{% if st.fired %}<div class="err">해고되었습니다. <a href="/settings">설정</a>에서 해고를 끄면 샌드박스로 계속할 수 있습니다.</div>{% endif %}
+<div class="grid c3">
+  <div class="card"><h2>시즌 기대치 — {{ tier }}</h2>
+    <div class="big">{{ st.wins_mean|f1 }}승 <span class="mute small">±{{ st.wins_sd|f1 }}</span></div>
+    <p class="small">플레이오프 {{ st.projection.p_playoffs|pct }} · 디비저널 {{ st.projection.p_div_round|pct }} · 컨퍼런스 결승 {{ st.projection.p_conf_final|pct }} · 우승 {{ st.projection.p_title|pct }}</p>
+    <p class="small mute">엔진으로 이번 시즌 일정을 돌려 팀 전력을 추정하고 200시즌을 투영한 값입니다.</p></div>
+  <div class="card"><h2>목표</h2><ul class="list">{% for g in goals %}<li>{{ '주 목표' if g.main else '보조 목표' }}: <b>{{ g.label }}</b>
+    {% if g.ok is not none %}<span class="{{ 'w' if g.ok else 'l' }}">{{ ('✓ 달성' if g.ok else '✗ 미달') if final else ('✓ 현재 충족' if g.ok else '✗ 현재 미충족') }}</span>{% endif %}</li>{% endfor %}</ul>
+    {% if st.grade %}<p>시즌 평가 <span class="big">{{ st.grade }}</span></p>{% endif %}</div>
+  <div class="card"><h2>신뢰도</h2><div class="big">{{ st.confidence|round|int }}/100</div>
+    <div class="bar"><i style="width:{{ st.confidence }}%;background:{{ 'var(--win)' if st.confidence >= 50 else 'var(--warn)' if st.confidence >= 25 else 'var(--loss)' }}"></i></div>
+    <p class="small mute">경고 {{ st.warnings }}/2 · 해고 {{ '켜짐' if st.firing else '꺼짐' }} · 경기 결과는 경기 전 예상 승률 대비로 반영됩니다.</p></div>
+</div>
+<div class="grid c2" style="margin-top:14px">
+  <div class="card"><h2>신뢰도 추이</h2><canvas id="conf" height="180"></canvas></div>
+  <div class="card"><h2>구단주 메시지</h2><ul class="list scroll" style="max-height:320px">{% for m in st.inbox|reverse %}<li><span class="pill">{{ m.week }}주</span> {{ m.text }}</li>{% endfor %}</ul></div>
+</div>
+<div class="card" style="margin-top:14px"><h2>경기별 변화</h2><table class="small">{% for h in hist|reverse %}<tr><td>{{ h.w }}주</td><td class="num">{{ h.v|round|int }}</td><td>{{ h.r }}</td></tr>{% endfor %}</table></div>
+{% endif %}
+{% endblock %}
+{% block scripts %}{% if st %}
+<script>
+new Chart(document.getElementById('conf'), {type: 'line', data: {labels: {{ hist|map(attribute='w')|list|tojson }}, datasets: [{data: {{ hist|map(attribute='v')|list|tojson }}, borderColor: '#3d9df2', pointRadius: 2, tension: .2}]},
+  options: {plugins: {legend: {display: false}}, scales: {y: {min: 0, max: 100, ticks: {color: '#93a1b2'}}, x: {ticks: {color: '#93a1b2'}}}}});
+</script>{% endif %}{% endblock %}

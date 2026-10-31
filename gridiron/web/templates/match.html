@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}{{ g.away }} @ {{ g.home }} · Gridiron Manager{% endblock %}
+{% block head %}<script src="/static/vendor/chart.umd.min.js"></script>{% endblock %}
+{% block content %}
+<div class="card" style="text-align:center">
+  <div class="mute small">{{ g.round if g.type != 'REG' else g.week ~ '주차' }} · {{ g.day }}</div>
+  <div class="row" style="justify-content:center;gap:40px">
+    <div><div class="swatch" style="background:{{ away.color }};width:18px;height:18px"></div> <b>{{ away.name }}</b></div>
+    {% set live = has_pbp and tab == 'live' %}
+    <div class="score" id="sb"{% if live %} x-data x-text="$store.m.score"{% endif %}>{% if live %}0 – 0{% elif g.played %}{{ g['as'] }} – {{ g.hs }}{% endif %}</div>
+    <div><b>{{ home.name }}</b> <div class="swatch" style="background:{{ home.color }};width:18px;height:18px"></div></div>
+  </div>
+  {% if g.played and not live %}<table class="small" style="max-width:420px;margin:6px auto"><tr><th></th>{% for i in range(qtrs[0]|length) %}<th class="num">{{ 'Q' ~ (i + 1) if i < 4 else 'OT' }}</th>{% endfor %}<th class="num">합계</th></tr>
+    <tr><td>{{ g.away }}</td>{% for v in qtrs[0] %}<td class="num">{{ v }}</td>{% endfor %}<td class="num"><b>{{ g['as'] }}</b></td></tr>
+    <tr><td>{{ g.home }}</td>{% for v in qtrs[1] %}<td class="num">{{ v }}</td>{% endfor %}<td class="num"><b>{{ g.hs }}</b></td></tr></table>{% endif %}
+</div>
+{% if not g.played %}<p class="mute">아직 치르지 않은 경기입니다.</p>{% else %}
+<div class="tabs" style="margin-top:12px">{% for k, v in [("live","중계"),("box","박스스코어"),("drives","드라이브"),("report","전술 리포트")] %}<a href="?tab={{ k }}" class="{{ 'on' if tab == k }}">{{ v }}</a>{% endfor %}</div>
+
+{% if tab == 'live' %}
+  {% if not has_pbp %}<p class="mute">이 경기는 중계 기록 없이 진행됐습니다 (우리 팀 경기만 중계를 저장합니다). 박스스코어를 보세요.</p>
+  {% else %}
+  <div class="grid c3" x-data>
+    <div class="card" style="grid-column:span 2">
+      <div class="row">
+        <button class="btn sm" @click="startReplay('full')">▶ 전체 중계</button>
+        <button class="btn sm" @click="startReplay('hl')">★ 하이라이트</button>
+        <button class="btn sm" @click="startReplay('instant')">⏭ 즉시 결과</button>
+        <button class="btn sm" @click="$store.m.paused = !$store.m.paused" x-text="$store.m.paused ? '계속' : '일시정지'"></button>
+        <label class="right">속도 <select x-model.number="$store.m.speed"><option value="0.5">0.5×</option><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option><option value="10">10×</option></select></label>
+      </div>
+      <div class="row" style="margin:10px 0"><b x-text="$store.m.situation"></b><span class="right mute" x-text="$store.m.qclock"></span></div>
+      <div class="field"><div class="los" :style="'left:' + $store.m.los + '%'"></div><div class="fd" :style="'left:' + $store.m.fd + '%'" x-show="$store.m.fd !== null"></div><div class="ball" :style="'left:' + $store.m.los + '%'"></div></div>
+      <div class="row small mute" style="justify-content:space-between"><span>◀ {{ g.home }} 엔드존</span><span>{{ g.away }} 엔드존 ▶</span></div>
+      <div class="pbp" id="pbp" style="margin-top:10px"></div>
+    </div>
+    <div class="card"><h2>{{ g.home }} 승률</h2><canvas id="wpc" height="260"></canvas></div>
+  </div>
+  {% endif %}
+{% elif tab == 'box' %}
+  <div class="grid c2">
+  <div class="card"><h2>팀 기록</h2><table><tr><th></th><th class="num">{{ g.away }}</th><th class="num">{{ g.home }}</th></tr>
+    {% for lab, a, h in rows %}<tr><td>{{ lab }}</td><td class="num">{{ a }}</td><td class="num">{{ h }}</td></tr>{% endfor %}</table></div>
+  <div class="card"><h2>패싱</h2><table><tr><th>선수</th><th></th><th class="num">C/A</th><th class="num">야드</th><th class="num">TD</th><th class="num">INT</th><th class="num">색</th></tr>
+    {% for r in ply.pass %}<tr><td><a href="/player/{{ r.id }}">{{ r.name }}</a></td><td class="mute">{{ r.team }}</td><td class="num">{{ r.c }}/{{ r.a }}</td><td class="num">{{ r.y }}</td><td class="num">{{ r.td }}</td><td class="num">{{ r.int }}</td><td class="num">{{ r.sk }}</td></tr>{% endfor %}</table>
+    <h2 style="margin-top:12px">러싱</h2><table><tr><th>선수</th><th></th><th class="num">시도</th><th class="num">야드</th><th class="num">TD</th></tr>
+    {% for r in ply.rush[:8] %}<tr><td><a href="/player/{{ r.id }}">{{ r.name }}</a></td><td class="mute">{{ r.team }}</td><td class="num">{{ r.n }}</td><td class="num">{{ r.y }}</td><td class="num">{{ r.td }}</td></tr>{% endfor %}</table></div>
+  <div class="card"><h2>리시빙</h2><table><tr><th>선수</th><th></th><th class="num">리셉션/타깃</th><th class="num">야드</th><th class="num">TD</th></tr>
+    {% for r in ply.rec[:12] %}<tr><td><a href="/player/{{ r.id }}">{{ r.name }}</a></td><td class="mute">{{ r.team }}</td><td class="num">{{ r.n }}/{{ r.tgt }}</td><td class="num">{{ r.y }}</td><td class="num">{{ r.td }}</td></tr>{% endfor %}</table></div>
+  <div class="card"><h2>수비 · 킥</h2><table><tr><th>선수</th><th></th><th class="num">태클</th><th class="num">색</th><th class="num">INT</th><th class="num">PD</th></tr>
+    {% for r in ply.def[:12] %}<tr><td><a href="/player/{{ r.id }}">{{ r.name }}</a></td><td class="mute">{{ r.team }}</td><td class="num">{{ r.tck }}</td><td class="num">{{ r.sk }}</td><td class="num">{{ r.int }}</td><td class="num">{{ r.pd }}</td></tr>{% endfor %}</table>
+    <table style="margin-top:8px">{% for r in ply.kick %}<tr><td>{{ r.name }}</td><td class="mute">{{ r.team }}</td><td>FG {{ r.fg }}</td><td>펀트 {{ r.pnt }} ({{ r.py }}yd)</td></tr>{% endfor %}</table></div>
+  </div>
+{% elif tab == 'drives' %}
+  {% if not tl %}<p class="mute">중계 기록이 있는 경기만 드라이브 차트를 볼 수 있습니다.</p>{% else %}
+  <div class="card"><table><tr><th>쿼터</th><th>시각</th><th>공격</th><th>시작</th><th class="num">플레이</th><th class="num">야드</th><th>결과</th><th style="width:35%"></th></tr>
+  {% for d in tl.drives %}<tr><td>{{ d.q }}</td><td>{{ d.clock }}</td><td><b>{{ d.team }}</b></td><td>{{ d.start_txt }}</td><td class="num">{{ d.plays }}</td><td class="num">{{ d.yds }}</td>
+    <td class="{{ 'w' if d.result in ('TD','FG') else 'l' if d.result == '턴오버' else '' }}">{{ d.result }}</td>
+    <td><div style="position:relative;height:10px;background:#0f141a;border-radius:4px"><i style="position:absolute;height:10px;border-radius:4px;left:{{ [d.start, d.end]|min }}%;width:{{ ([d.end - d.start, 1]|max) if d.end >= d.start else (d.start - d.end) }}%;background:{{ (home.color if d.t == 0 else away.color) }}"></i></div></td></tr>{% endfor %}
+  </table><p class="small mute">막대: 공격 팀 기준 자기 진영(왼쪽) → 상대 엔드존(오른쪽)</p></div>
+  {% endif %}
+{% elif tab == 'report' %}
+  {% if not tl or not tl.report %}<p class="mute">전술 리포트는 중계를 저장한 경기에만 있습니다.</p>{% else %}
+  <div class="grid c2">{% for abbr, r in tl.report.items() %}<div class="card"><h2>{{ abbr }} 전술 리포트</h2>
+    <table><tr><td>노출도 (상대가 우리 공격을 읽은 정도)</td><td class="num">{{ r.exposure|round|int }}/100</td></tr>
+    <tr><td>상대 적중률 (상대가 우리 콜에 맞춰 대응한 비율)</td><td class="num">{{ (r.countered_rate * 100)|round|int }}%</td></tr>
+    <tr><td>읽힘 손실 플레이 (평균 효과)</td><td class="num">{{ r.anticip_plays }} ({{ '%+.2f'|format(r.anticip_mean) }})</td></tr>
+    <tr><td>궁합 손실 지수</td><td class="num">{{ r.fit_loss }}</td></tr><tr><td>커버리지 붕괴</td><td class="num">{{ r.busts }}회</td></tr>
+    <tr><td>적용된 상대 대응 강도 λ</td><td class="num">{{ r.lam|round(2) }}</td></tr></table></div>{% endfor %}</div>
+  <p class="small mute">플레이 패밀리별 성공률·EPA, 쿼터별 효율 추이는 M7에서 추가합니다.</p>
+  {% endif %}
+{% endif %}
+{% endif %}
+{% endblock %}
+{% block scripts %}
+{% if has_pbp and tab == 'live' %}
+<script>
+// 차트·프레임은 Alpine 반응형 밖에 둔다 (Chart.js 객체를 프록시하면 재귀 오류)
+let FRAMES = [], CHART = null, TIMER = null, IDX = 0, MODE = null;
+document.addEventListener('alpine:init', () => {
+  Alpine.store('m', {speed: 1, paused: false, score: '{{ g["as"] }} – {{ g.hs }}', situation: '경기 시작 전', qclock: '', los: 35, fd: null});
+});
+function addWp(f) { if (f.wp !== null && f.wp !== undefined) { CHART.data.labels.push(CHART.data.labels.length); CHART.data.datasets[0].data.push(Math.round(f.wp * 1000) / 10); } }
+function showFrame(f) {
+  const m = Alpine.store('m');
+  const el = document.createElement('div');
+  el.textContent = (f.clock && !f.head ? f.clock + ' ' : '') + f.text;
+  if (f.head) el.className = 'q'; else if (f.td) el.className = 'td';
+  const box = document.getElementById('pbp'); box.appendChild(el); box.scrollTop = box.scrollHeight;
+  m.score = f.pts[1] + ' – ' + f.pts[0];
+  m.qclock = (f.q > 4 ? 'OT' : f.q + 'Q') + ' ' + f.clock;
+  if (f.pos !== null && f.pos !== undefined) {
+    const home = f.t === 0; const abs = home ? f.pos : 100 - f.pos; m.los = abs;
+    m.fd = f.toGo ? Math.max(0, Math.min(100, home ? abs + f.toGo : abs - f.toGo)) : null;
+    const d = ['', '1st', '2nd', '3rd', '4th'][f.down] || '';
+    m.situation = (f.t === 0 ? '{{ g.home }}' : '{{ g.away }}') + ' 공격 · ' + d + ' & ' + f.toGo;
+  }
+  addWp(f);
+}
+function startReplay(mode) {
+  clearTimeout(TIMER); IDX = 0; MODE = mode; Alpine.store('m').paused = false;
+  document.getElementById('pbp').innerHTML = ''; CHART.data.labels = []; CHART.data.datasets[0].data = [];
+  if (mode === 'instant') { FRAMES.forEach(showFrame); CHART.update(); Alpine.store('m').situation = '경기 종료'; return; }
+  tick();
+}
+function tick() {
+  const m = Alpine.store('m');
+  if (IDX >= FRAMES.length) { m.situation = '경기 종료'; CHART.update(); return; }
+  if (m.paused) { TIMER = setTimeout(tick, 200); return; }
+  const f = FRAMES[IDX++];
+  if (MODE === 'full' || f.hl) { showFrame(f); CHART.update(); } else { m.score = f.pts[1] + ' – ' + f.pts[0]; addWp(f); }
+  const wait = MODE === 'full' ? 600 : (f.hl ? 900 : 0);
+  TIMER = setTimeout(tick, wait / m.speed);
+}
+document.addEventListener('alpine:initialized', async () => {
+  Alpine.store('m').start = startReplay;
+  const r = await fetch('/match/{{ g.id }}/timeline.json'); FRAMES = (await r.json()).frames;
+  CHART = new Chart(document.getElementById('wpc'), {type: 'line', data: {labels: [], datasets: [{data: [], borderColor: '{{ home.color }}', pointRadius: 0, tension: .2}]},
+    options: {animation: false, plugins: {legend: {display: false}}, scales: {y: {min: 0, max: 100, ticks: {color: '#93a1b2', callback: v => v + '%'}}, x: {display: false}}}});
+  startReplay('full');
+});
+</script>
+{% endif %}
+{% endblock %}

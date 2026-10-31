@@ -15,7 +15,8 @@ from fastapi import Request
 from ..domain.models import League
 
 _cache: dict[Path, tuple[int, League, str | None]] = {}
-LOCK = threading.RLock()          # 리그를 바꾸는 작업은 한 번에 하나
+LOCK = threading.RLock()          # 리그를 바꾸는 작업(백그라운드 진행·전술 비교)은 한 번에 하나
+_CACHE_LOCK = threading.Lock()    # 캐시 읽기·쓰기만 (화면 요청이 진행 작업을 기다리지 않게)
 
 
 def saves_dir() -> Path:
@@ -48,19 +49,21 @@ def slots() -> list[dict]:
 
 
 def load(path: Path) -> tuple[League, str | None]:
+    """세이브의 리그. 진행 작업이 도는 동안에는 (파일이 계속 바뀌므로) 직전에 읽은 것을 그대로 보여준다."""
     from ..db.store import load_league
-    with LOCK:
-        mt = path.stat().st_mtime_ns
+    from .jobs import running
+    with _CACHE_LOCK:
         hit = _cache.get(path)
-        if hit and hit[0] == mt:
+        if hit and (hit[0] == path.stat().st_mtime_ns or running() is not None):
             return hit[1], hit[2]
-        league, user = load_league(path)
+    league, user = load_league(path)
+    with _CACHE_LOCK:
         _cache[path] = (path.stat().st_mtime_ns, league, user)
-        return league, user
+    return league, user
 
 
 def invalidate(path: Path | None = None) -> None:
-    with LOCK:
+    with _CACHE_LOCK:
         if path is None:
             _cache.clear()
         else:
@@ -89,5 +92,8 @@ def current(request: Request) -> Ctx | None:
         return None
     if not path.exists():
         return None
-    league, user = load(path)
+    try:
+        league, user = load(path)
+    except Exception:  # noqa: BLE001 — 새 게임을 만드는 중(빈 파일)이거나 읽을 수 없는 세이브
+        return None
     return Ctx(name, path, league, user)

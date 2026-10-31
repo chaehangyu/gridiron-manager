@@ -25,7 +25,8 @@ gridiron/tactics   전술 3계층·프리셋, 숙련도, 훈련, 스카우팅, �
 gridiron/season    weekly(주간 진행), M5부터 시즌 구조(타이브레이커·플레이오프)·부상·로스터·구단주
 gridiron/db        SQLite 세이브(schema.py는 다년 대비 테이블이 이미 정의됨: Injury, Transaction, Owner*, Scout*)
 gridiron/cli*.py   명령줄 (cli.py 경기·시즌, cli_tactics.py 전술·훈련, cli_season.py 부상·로스터·구단주·선수·스카우팅)
-gridiron/web       (M6) FastAPI + Jinja2 + HTMX — CLI와 같은 함수를 호출하는 화면
+gridiron/web       FastAPI + Jinja2 + HTMX + Alpine (static/vendor에 라이브러리 포함). app.py(render·need_ctx·작업 중 POST 차단),
+                   state.py(슬롯·캐시), jobs.py(백그라운드 진행), routes/{core,squad,tactics,league}.py, match.py, templates/
 tools/             보정·검증 스크립트
 ```
 
@@ -40,4 +41,5 @@ pip install -e ".[dev,web]"
 python -m pytest -q
 gridiron new-game --source real --team KC --save saves/career.sqlite
 gridiron sim-week --save saves/career.sqlite
+gridiron serve                      # 웹 UI (http://127.0.0.1:8000)
 ```
